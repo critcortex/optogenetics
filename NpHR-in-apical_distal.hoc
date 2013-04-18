@@ -1,0 +1,74 @@
+/*----------------------------------------------------- 
+ Natronomonas pharaonis halorhodopsin (NpHR) 3-state model 
+ in dendrites 
+ ------------------------------------------------------*/
+
+// --------------------------------------------------
+//    Parameter Settings
+// --------------------------------------------------
+//HRexp = 5e-4 //  HR expression density   
+// del_light = 650    // delay time before light ON
+//t_on = 300  // ms
+//t_off = 350
+n_pulses = 2
+//tstop = 450
+//pd = 10  // mW/mm2  light intensity
+
+//v_init = -65
+
+print "NpHR_apic_distal"
+objref HaloR_apic
+//  Apical dendrites stimulation
+
+// parameters for the pump are: e1, k20, k3dark, k3light
+   e1 = 0.002   // (1/ms)
+   k20 = 0.14  // this corresponds to tau_off=7ms in Zhang2007 paper
+   k3dark = 0.1
+   k3light = 0.02
+   gpump = 0.001   // conductance of the pump
+
+proc NpHR_in_apical_distal () {
+
+    HRexp = $1
+    pd = $2         // 10 mW/mm^2
+    del_light = $3  // 650 ms  delay time before light ON
+    t_on = $4       // 300 ms  
+    t_off = $5
+    expdist = $6    // distance of expression 
+    n_pulses = $7
+    
+    HaloR_apic = new List()
+    HRapic=HRexp  
+  i=0
+  print "HaloR_apic_distal"
+  print "HaloR distribution [index, section, segment, area, gbar, distance]:"  
+  
+  for k=0,108 {
+      L5PC.apic[k] {     
+          for(x,0){
+            if(distance(x)>expdist){
+                  HaloR_apic.append(new NpHR(x))  
+                  HaloR_apic.o(i).gbar= HRapic*area(x) 
+                  HaloR_apic.o(i).Er=pd         
+                  HaloR_apic.o(i).delay=del_light
+		  HaloR_apic.o(i).pulsewidth=t_on        
+                  HaloR_apic.o(i).interpulse_interval=t_off      
+                  HaloR_apic.o(i).n_pulses=n_pulses                    
+                  HaloR_apic.o(i).e1=e1            
+                  HaloR_apic.o(i).k20=k20            
+		  HaloR_apic.o(i).k3dark=k3dark 
+		  HaloR_apic.o(i).k3light=k3light 
+                  HaloR_apic.o(i).gpump=gpump
+
+//print i, secname()," ", HaloR_apic.o(i).get_loc, area(x), HaloR_apic.o(i).gbar, distance(x)
+                  areatot  += area(x)           
+                  gbartot  += HaloR_apic.o(i).gbar 
+                  i=i+1      
+            }
+          }
+      }
+  }
+print "Number of segments populated: ",i, " Total area: ", areatot, " Total HR gbar: ", gbartot
+}
+
+
