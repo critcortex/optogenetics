@@ -22,11 +22,17 @@ sampleexpression = [5e-4,10,600,200,350,600]
 LOCATION_ALL = ['soma','basal','axon','apical_proximal','apical_distal']
 samplevalues = [[x,sampleexpression] for x in LOCATION_ALL]
 
+areasNone= {'None' : [None] }             
+areasSoma = {'soma' : ['soma']}
+areasAll = {'whole' : LOCATION_ALL}
+
 
 areaSections = {    'apical'    : ['apical_distal','apical_proximal'],
                     'basal'     : ['basal'],
                     'basalsoma' : ['basal','soma'],
                     'soma'      : ['soma'],
+                    'axon'      : ['axon'] ,
+                    'none'      : [None],
                     'whole'     : LOCATION_ALL }
 
 SECTIONS_DICT = areaSections
@@ -36,9 +42,7 @@ areasPaper = {   'apical': ['apical_proximal','apical_distal'],
             'soma'  : ['soma'],
             'axon'  : ['axon'] }
 
-areasNone= {'None' : [None] }             
-areasSoma = {'soma' : ['soma']}
-areasAll = {'whole' : LOCATION_ALL}
+
 
 both_expression = [5e-4,10,500,500,350,600,1]
 first_expression= [5e-4,10,200,50,400,600,10]
@@ -148,10 +152,15 @@ class SampleJob():
 #----------------------------------------------
 class ExpSetup():    
     
-    def __init__(self):
-        print 'Have created engine'
-        self.expengine = ExpEngine()
+    
         
+        
+    def get_areas_section(self):
+        return areaSections
+
+    def get_areas_paper(self):
+        return areasPaper
+
     
     def get_default_params(self):
         defaultp= {  'expname'           : None,
@@ -162,6 +171,8 @@ class ExpSetup():
                 'ChR_times'         : ChR_expression,
                 'description'       : '',
                 'soma_stim_DC'      : 1.,
+                'iclamp_start'      : 100.,
+                'iclamp_duration'   : 100.,
                 'EPSPamp'           : 0.5
               }
         
@@ -220,9 +231,14 @@ class ExpSetup():
                 
         return paramlist
 
-                    
     
-    def run_frequency_range(self,expbase,freqs=[0.5,1,2.5,5,10],pulsewidth=10.,transient=200.,n_pulses=10,params={}):
+    def run_single_experiment(self,expbase,runon='local',params={}):
+        """
+        
+        """
+        self.main(expbase,params,runon=runon)                    
+    
+    def run_frequency_range(self,expbase,freqs=[0.5,1,2.5,5,10],pulsewidth=10.,transient=200.,n_pulses=10,runon='local',params={}):
         """
         
         Params:
@@ -237,12 +253,11 @@ class ExpSetup():
             t_off = interstim_interval - pulsewidth
             ChR_expression= [OPSIN_EXP,OPSIN_IRR,transient,pulsewidth,t_off,OPSIN_EXPDIST,n_pulses]
             NpHR_expression = [OPSIN_EXP,OPSIN_IRR,transient+offset,pulsewidth,t_off,OPSIN_EXPDIST,n_pulses]
-            #print ChR_expression
             params.update({'NpHR_times':NpHR_expression,'ChR_times':ChR_expression,'description':'_freq%g_pw%g'%(f,pulsewidth)})
-            self.main(expbase,params)
+            self.main(expbase,params,runon=runon)
+
     
-    
-    def run_irraidiance_range(self,expbase,irr_range=[1,2,5,10,20,50,100],pulsewidth=10.,transient=200.,n_pulses=10,freq=2.,params={}):
+    def run_irraidiance_range(self,expbase,irr_range=[1,2,5,10,20,50,100],pulsewidth=10.,transient=200.,n_pulses=10,freq=2.,runon='local',params={}):
         """
         
         Params:
@@ -259,9 +274,9 @@ class ExpSetup():
             ChR_expression= [OPSIN_EXP,irr,transient,pulsewidth,t_off,OPSIN_EXPDIST,n_pulses]
             NpHR_expression = [OPSIN_EXP,irr,transient+offset,pulsewidth,t_off,OPSIN_EXPDIST,n_pulses]
             params.update({'NpHR_times':NpHR_expression,'ChR_times':ChR_expression,'description':'_irr%g_freq%g_pw%g'%(irr,freq,pulsewidth)})
-            self.main(expbase,params)
+            self.main(expbase,params,runon=runon)
     
-    def run_test_exp(self,expbase,params={}):
+    def run_test_exp(self,expbase,runon='local',params={}):
         """
         A simple self-contained test case that can be used without having to set up too many params.
         Should eventually be migrated to a JUnit-like testcase
@@ -280,7 +295,7 @@ class ExpSetup():
                        'ChR_areas': dict(areasSoma.items() + areasAll.items() + areasNone.items()), #
                        'description':'_testexperiment'})
         
-        self.main(expbase,params,runon='saveonly')
+        self.main(expbase,params,runon=runon)
         
 
     
@@ -293,12 +308,20 @@ class ExpSetup():
         """
         
         """
-        print "Running for experiment", expname
+        self.expengine = ExpEngine()
+        print "Running for experiment", expname, 'locally'
         params = self.get_default_params()
         params.update(newparams)
         fio.setup_experiment(expname)
-        self.expengine.start_queue(params['num_threads'])
         exps = self.generate_params(expname,params)
+        #TODO work out a better way of handling this
+        if len(exps)>params['num_threads']:
+            print 'WARNING - you have more jobs than threads. Errors will probably occur'
+            print '-------------> we will set the number of workers == number of threads. Eek'
+            self.expengine.start_queue(len(exps))
+        else:
+            self.expengine.start_queue(params['num_threads'])
+        
         for exp in exps:
             self.expengine.add_experiment(exp)
         self.expengine.end_engine()
@@ -308,7 +331,7 @@ class ExpSetup():
         """
         
         """
-        print "Running for experiment", expname
+        print "Running for experiment", expname, 'on cluster'
         params = self.get_default_params()
         params.update(newparams)
         fio.setup_experiment(expname)
@@ -326,7 +349,9 @@ class ExpSetup():
         if runon=='local':
             self.main_run_local(expname,newparams)
         elif runon=='cluster' or runon=='saveonly':
-            self.main_run_cluster(expname,newparams)
+            self.main_run_cluster(expname,newparams,runjob=(runon=='cluster'))
+        else:
+            raise Exception('Unknown option for runon: %s'%runon)
 
 
 

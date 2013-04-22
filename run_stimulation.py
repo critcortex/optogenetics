@@ -6,6 +6,8 @@ import file_io as fio
 from neuron import h
 from nrn    import *
 import pylab
+#import matplotlib
+#matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
@@ -183,7 +185,7 @@ class NeuronExperiment:
                     print "No locations specified for opsin : ",opsin
         
     
-    def set_stimulus (self) :
+    def set_stimulus (self,params) :
         """
         Set stimuli objects:
             st1        IClamp object at soma
@@ -217,8 +219,10 @@ class NeuronExperiment:
         h.st1.loc(0.5, sec=h.L5PC.soma[0])
         h.st1.amp = somastimamp
         #st1.del = tstart --> error as del is reserved word in python
-        setattr(h.st1, 'del', h.tstart)
-        h.st1.dur = h.tstop-h.tstart-100
+        st1_delay = params['iclamp_start']
+        st1_duration = params['iclamp_duration']
+        setattr(h.st1, 'del', st1_delay)
+        h.st1.dur = st1_duration
         h('L5PC.soma st1')
         
         
@@ -364,9 +368,10 @@ class NeuronExperiment:
             np.savetxt(expname+".dat",mat)
             
             if len(opsindict.keys())>0:
-                """
+                
                 # A horrible hack to get around python/NEURON conversion fun
                 # TODO: convert this to a method that uses pointers/dict in python - easier
+                """
                 h('objref list_i_opsin')
                 for opsin in opsindict.keys():
                     if not self.is_opsin_present(opsindict[opsin],opsin):
@@ -427,7 +432,7 @@ class NeuronExperiment:
         if params.has_key('opdict'):
             for (opsin,opexpressions) in params['opdict'].iteritems():
                 for opexp in opexpressions:
-                    if opexp[0] is None or opexp[0] == 'None':
+                    if opexp[0] is None or opexp[0].lower() == 'none':
                         continue
                     for pulsenum in range(opexp[1][6]):                
                         pulse_start = opexp[1][2]+pulsenum*(opexp[1][3]+opexp[1][4])
@@ -436,6 +441,13 @@ class NeuronExperiment:
                     # TODO: think how to extend this to allow for different areas to be indicated i.e. ChR in soma vs ChR in apical dendritic arbor
                     break
         pylab.title('V')
+        ax = pylab.gca()
+        for loc, spine in ax.spines.iteritems():
+            if loc in ['left','bottom']:
+                spine.set_position(('outward',5))
+                ax.tick_params(direction='out')
+            elif loc in ['right','top']:
+                spine.set_color('none') 
         pylab.legend()
         
         # Plot currents at soma and i_syn
@@ -445,7 +457,7 @@ class NeuronExperiment:
         if params.has_key('opdict'):
             for (opsin,opexpressions) in params['opdict'].iteritems():
                 for opexp in opexpressions:
-                    if opexp[0] is None or opexp[0] == 'None':
+                    if opexp[0] is None or opexp[0].lower() == 'none':
                         continue
                     h('objref list_i_opsin')
                     h('list_i_opsin = new List()')
@@ -455,6 +467,13 @@ class NeuronExperiment:
         pylab.xlim(h.tstart-20,h.tstop+20)
         pylab.ylim(-3,6)
         pylab.title('I')
+        ax = pylab.gca()
+        for loc, spine in ax.spines.iteritems():
+            if loc in ['left','bottom']:
+                spine.set_position(('outward',5))
+                ax.tick_params(direction='out')
+            elif loc in ['right','top']:
+                spine.set_color('none') 
         pylab.legend()
         
         
@@ -485,7 +504,7 @@ class NeuronExperiment:
         print '\n'*2, '='*40, keydict['expname']
         self.setup(tstart=keydict['tstart'],tstop=keydict['tstop'])
         self.set_experiment_type(keydict)
-        self.set_stimulus()
+        self.set_stimulus(keydict)
         self.add_optogenetics(keydict['opdict'])
         self.setup_record(keydict['opdict'])
         self.setup_plot()
@@ -508,11 +527,12 @@ if __name__ == '__main__':
         if sys.argv[1]=='run_from_file': # TODO: make this more generic
             for fn in sys.argv[2:]:
                 print 'run from file-----------', fn 
-                try:
+                if True: #try:
                     basename = NE.run_from_file(fn)
-                    fio.finish_experiment(basename)
-                except:
-                    print 'Error with running job',fn
+                #try:
+                #    fio.finish_experiment(basename)
+                #except:
+                #    print 'Error with running job',fn
     
        
 #if __name__ == '__main__':
