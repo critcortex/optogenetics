@@ -449,6 +449,8 @@ class NeuronExperiment:
             elif loc in ['right','top']:
                 spine.set_color('none') 
         pylab.legend()
+        pylab.xlabel('time (ms)')
+        pylab.ylabel('V (mV)')
         
         # Plot currents at soma and i_syn
         pylab.figure(2)
@@ -465,7 +467,7 @@ class NeuronExperiment:
                     pylab.plot(h.tvec,h.list_i_opsin.object(0),color=opsin_dict[opsin]['color'],label='i_%s'%opsin)
                     break
         pylab.xlim(h.tstart-20,h.tstop+20)
-        pylab.ylim(-3,6)
+        #pylab.ylim(-3,6)
         pylab.title('I')
         ax = pylab.gca()
         for loc, spine in ax.spines.iteritems():
@@ -475,6 +477,8 @@ class NeuronExperiment:
             elif loc in ['right','top']:
                 spine.set_color('none') 
         pylab.legend()
+        pylab.xlabel('time (ms)')
+        pylab.ylabel('I (nA)')
         
         
         if params['expname'] is not None:
