@@ -1,5 +1,6 @@
 
 
+from matplotlib import cm, colors
 import numpy as np
 import pylab 
 import glob
@@ -7,7 +8,7 @@ import time
 import pickle as pkl
 #import NeuroTools.signals  
 
-DEFAULT_FREQ = [0.5,1,1.5,2,2.5,3,4,5,6,7,8,9,10,15,20,30,35,40,45,50]
+DEFAULT_FREQ = [0.5,1,1.5,2,2.5,4,5,6,7,8,9,10,15,20,30,35,40,45,50]
 DEFAULT_IRRAD = [1,2,5,10,20,50,100]
 DEFAULT_PARAMS = {'FREQ':DEFAULT_FREQ,'IRRAD':DEFAULT_IRRAD}
 DEFAULT_ANALYSIS_SETTINGS = {'v_th': -20., 'tstart':200,'tstop':2000}
@@ -23,8 +24,18 @@ OPSINS_IPHOTO = {'ChR': False,
              'NpHR': True,
              'ArchT': True}
 
-RC_SETTINGS = {'paper': {'lw': 3, 'colors':['r','b','k','g','y','r','b','k','g','y']},
-               'poster': {'lw': 4, 'colors':['r','b','k','g']}}
+RC_SETTINGS = {'paper': {'lw': 3, 
+                         'lw_fine':1,
+                         'alpha':0.5,
+                         'colors':['r','b','k','g','y','r','b','k','g','y'],
+                         'cmaps':['YlOrRd','GnBu','jet']},
+               'poster': {'lw': 4, 
+                          'lw_fine':2,
+                          'alpha':0.5,
+                          'colors':['r','b','k','g'],
+                          'cmaps':['GnBu','YlOrRd']}}
+
+
 
 class AnalyticFrame:
     
@@ -36,6 +47,10 @@ class AnalyticFrame:
         
     #def add_experimentset(self,expset):
     #    self.experimentset.append(expset)
+    
+    def update_params(self,newparams):
+        self.analysis_params.update(newparams)
+        print 'Updated parameters. New parameters are:',self.analysis_params
 
     def populate_expset(self,basenames,expsubselects,explabels,exp_mainparams):
         if type(basenames) == 'list':
@@ -83,7 +98,25 @@ class AnalyticFrame:
                 self.populate_expset(expbase,[expsubselect],[explabel],exp_mainparams)
         except:
             print 'Error: could not '
-
+    def submenu_analysis_params(self):
+        """
+        
+        """
+        try:
+            update = raw_input('Would you like to update params? y/(n):')
+            if update.upper() != 'Y':
+                return
+            else:
+                print 'Updating analysis parameters. Press enter to keep current value'
+                for (k,v) in self.analysis_params.iteritems():
+                    new_value = raw_input('Param[%s]. Current value = %s \t\t. Enter new value? '%(k,v))
+                    if new_value != '':
+                        self.analysis_params[k] = new_value
+        except:
+            print 'Error with updating analysis params.'
+            return 
+        
+        
     def run_analysis_menu(self):
         txt = "Enter type of analysis to run: \n\
                 0 - enter experiment bases to compare \n\
@@ -91,6 +124,8 @@ class AnalyticFrame:
                 2 - Calc peak photocurrent \n\
                 A - Analyse experiment sets \n\
                 [D - run default analysis with default parameters] \n\
+                S - save/update experimental analysis \n\
+                M - print and set analysis parameters \n\
                 G - plot trends (will be prompted for type of plot) \n\
                 P - print all values for all loaded experiments \n\
                 Q - Quit \n > "
@@ -117,7 +152,7 @@ class AnalyticFrame:
                 #    for exp in self.experimentset:
                 #        exp.set_experiments()
                 # ------------------------------------------------------
-                if opt == 'A':
+                if opt.upper() == 'A':
                     print 'Analyse experiment sets'
                     analysis_fns = FUNCTION_LOOKUP.keys() # TODO: allow it to be user driven
                     print 'Types of analysis to be performed:',analysis_fns 
@@ -131,7 +166,7 @@ class AnalyticFrame:
                 # ------------------------------------------------------        
                 if opt.upper() == 'G':
                     print "Current plots available:"
-                    kk = ['FI'] #TODO: get superset of keys for all exp.results
+                    kk = ['FI','IClamp','IClamp_iPhoto'] #TODO: get superset of keys for all exp.results
                     for (i,k) in enumerate(kk):
                         print '%g - %s'%(i,k)
                     #try:
@@ -148,7 +183,12 @@ class AnalyticFrame:
                 if opt.upper() == 'P':
                     print 'Current expbases: '
                     for exp in self.experimentset:
+                        exp.print_exps()
                         exp.print_data()
+                # ------------------------------------------------------
+                if opt.upper() == 'M':
+                    print 'Current analysis settings are:',self.analysis_params
+                    self.submenu_analysis_params()
                 # ------------------------------------------------------
                 if opt.upper() == 'Q':
                     return
@@ -163,18 +203,37 @@ class AnalyticFrame:
         """
 class ExperimentPlotter:
     
+    
+    def __get_color(self,cmap,value=0.8):
+        cNorm = colors.Normalize(vmin=0,vmax=1) 
+        scalarMap = cm.ScalarMappable(norm=cNorm, cmap=cmap)
+        return scalarMap.to_rgba(value)
+    
+    def __turn_off_border(self,ax):
+        for loc, spine in ax.spines.iteritems():
+            if loc in ['left','bottom']:
+                spine.set_position(('outward',5))
+                ax.tick_params(direction='out')
+            elif loc in ['right','top']:
+                spine.set_color('none') # don't draw spine
+        
     def plot_FI(self,experimentsets,savefig=None,settings='paper'):
         rcsettings = RC_SETTINGS[settings]
-        #TODO: set automatic color scale, based on number of experimens in expset
         pylab.figure() 
+        intensities = np.linspace(0.1, 0.9, len(experimentsets))
         for (i,expset) in enumerate(experimentsets):
-            pylab.plot(expset.expvariables,expset.results['FI'],lw=rcsettings['lw'],c=rcsettings['colors'][i],label=expset.get_label())
+            print 'i=%g, intensities[i]='%i,intensities[i]
+            pylab.plot(expset.expvariables,expset.results['FI'],lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][0],intensities[i]),label=expset.get_label())
+        # turn the right and top axes off
+        self.__turn_off_border(pylab.gca())
         
+        pylab.ylabel('Output frequency (Hz)')
+        pylab.xlabel('Input frequency (Hz)')
         # increase scale so that we have some space to place the legend
         pylab.ylim(ymax=pylab.ylim()[1]*1.2)
-        # turn the right and top axes off
-        #TODO: turn off right and top axes
-          
+        
+        
+
         # Prettify the legend
         leg = pylab.legend(loc=2,fancybox=True)
         leg.get_frame().set_alpha(0.5) 
@@ -184,6 +243,124 @@ class ExperimentPlotter:
             pylab.savefig(figname)
             print 'Saved figure as %s'%figname
 
+    def plot_FIphoto(self,experimentsets,savefig=None,settings='paper'):
+        #TODO: plot
+        pass
+        """
+        rcsettings = RC_SETTINGS[settings]
+        pylab.figure() 
+        intensities = np.linspace(0.1, 0.9, len(experimentsets))
+        for (i,expset) in enumerate(experimentsets):
+            print 'i=%g, intensities[i]='%i,intensities[i]
+            pylab.plot(expset.expvariables,expset.results['FI'],lw=rcsettings['lw'],c=self.get_color(rcsettings['cmaps'][0],intensities[i]),label=expset.get_label())
+        pylab.ylabel('Output frequency (Hz)')
+        pylab.xlabel('Input frequency (Hz)')
+        # increase scale so that we have some space to place the legend
+        pylab.ylim(ymax=pylab.ylim()[1]*1.2)
+        
+        # turn the right and top axes off
+        ax = pylab.gca()
+        for loc, spine in ax.spines.iteritems():
+            if loc in ['left','bottom']:
+                spine.set_position(('outward',5))
+                ax.tick_params(direction='out')
+            elif loc in ['right','top']:
+                spine.set_color('none') # don't draw spine
+        
+        # Prettify the legend
+        leg = pylab.legend(loc=2,fancybox=True)
+        leg.get_frame().set_alpha(0.5) 
+        
+        if savefig is not None:
+            figname = '%sFI_%s.png'%(time.strftime('%y%m%d'),savefig)
+            pylab.savefig(figname)
+            print 'Saved figure as %s'%figname
+        """
+
+    def plot_IClamp(self,experimentsets,savefig=None,settings='paper'):
+        """
+        Plots soma voltages of multiple experiments onto same figure
+        """
+        rcsettings = RC_SETTINGS[settings]
+        for (i,expset) in enumerate(experimentsets):
+            
+            pylab.figure() 
+            intensities = np.linspace(0.1, 0.9, len(expset.experiments))
+            for (j,exp) in enumerate(expset.experiments):
+                (ts,vsoma) = exp.get_voltage_trace()
+                print 'j=%g, intensities[i]='%j,intensities[j],' .................',
+                print exp
+                pylab.plot(ts,vsoma,lw=rcsettings['lw_fine'],c=self.__get_color(rcsettings['cmaps'][0],intensities[j]),alpha=rcsettings['alpha'])
+            self.__turn_off_border(pylab.gca())
+            pylab.xlabel('time (ms)')
+            pylab.ylabel('v_soma (mV)')
+            
+            
+            if savefig is not None:
+                figname = '%s_voltage_trace_%s_expset%g.png'%(time.strftime('%y%m%d'),savefig,i)
+                pylab.savefig(figname)
+                print 'Saved figure as %s'%figname
+
+    def plot_IClamp_FR(self,experimentsets,savefig=None,settings='paper'):
+        """
+        
+        """
+        rcsettings = RC_SETTINGS[settings]
+        for (i,expset) in enumerate(experimentsets):
+            
+            pylab.figure() 
+            intensities = np.linspace(0.1, 0.9, len(expset.experiments))
+            for (j,exp) in enumerate(expset.experiments):
+                (ts,vsoma) = exp.get_voltage_trace()
+                print 'j=%g, intensities[i]='%j,intensities[j],' .................',
+                print exp
+                pylab.plot(ts,vsoma,lw=rcsettings['lw_fine'],c=self.__get_color(rcsettings['cmaps'][0],intensities[j]),alpha=rcsettings['alpha'])
+            pylab.xlabel('time (ms)')
+            pylab.ylabel('v_soma (mV)')
+            self.__turn_off_border(pylab.gca())
+            
+            if savefig is not None:
+                figname = '%s_voltage_trace_%s_expset%g.png'%(time.strftime('%y%m%d'),savefig,i)
+                pylab.savefig(figname)
+                print 'Saved figure as %s'%figname
+        
+        
+        
+        
+    def plot_IClamp_iPhoto(self,experimentsets,savefig=None,settings='paper'):
+        """
+        
+        
+        """
+        rcsettings = RC_SETTINGS[settings]
+        for (i,expset) in enumerate(experimentsets):
+            
+            for opsintype in OPSINS_IPHOTO:
+            
+                fig = pylab.figure() 
+                intensities = np.linspace(0.1, 0.9, len(expset.experiments))
+                try:
+                    for (j,exp) in enumerate(expset.experiments):
+                        (ts,iphoto) = exp.get_iPhoto_opsin(opsintype)
+                        
+                        print 'j=%g, intensities[i]='%j,intensities[j],' .................',
+                        print exp
+                        print '-----------------', ts[0:10]
+                        print '-----------------', iphoto[0:10]
+                        ax = fig.gca()
+                        ax.plot(ts,iphoto,lw=rcsettings['lw_fine'],c=self.__get_color(rcsettings['cmaps'][0],intensities[j]),alpha=rcsettings['alpha'])
+                except:
+                    pylab.close(fig)
+                    continue
+                self.__turn_off_border(ax)
+                ax.set_xlabel('time (ms)')
+                ax.set_ylabel('I_%s (nA)'%opsintype)
+                
+                
+                if savefig is not None:
+                    figname = '%s_iphoto_trace_%s_%s_expset%g.png'%(time.strftime('%y%m%d'),opsintype,savefig,i)
+                    fig.savefig(figname)
+                    print 'Saved figure as %s'%figname
 
 class ExperimentSet:
 
@@ -239,22 +416,29 @@ class ExperimentSet:
         print 'calculate responses', key
         # TODO: rewrite with debugger/warning info statements
         #if self.expvariables.has_key(key):
-        #try:
-        if True:
+        try:
+        #if True:
             if not recalc:
                 if self.results.has_key(key):
                     print 'Results for %s already exists'%key 
                     return
             tmp_results = []
             for exp in self.experiments:
-                tmp_results.append(getattr(exp, FUNCTION_LOOKUP[key])())
+                tmp_v = getattr(exp, FUNCTION_LOOKUP[key])()
+                print tmp_v, '-------------------------------------------------------'
+                tmp_results.append(tmp_v)
             self.results[key] = tmp_results
-        #except:
+        except:
             print "Could not calculate responses, unknown variable value = ", key
         #print 'Current results ',self.results
     
+    def print_exps(self,indent=4):
+        print self.basename,self.subselect, 'contains experiments:'
+        for exp in self.experiments:
+            print ' '*indent, exp
+    
     def print_data(self,indent=4):
-        print self.basename,self.subselect
+        print self.basename,self.subselect, 'contains data:'
         for (k,v) in self.results.iteritems():
             print ' '*indent, '%s = %s'%(k,v)
 
@@ -272,7 +456,7 @@ class Experiment:
     
     
     def save_results(self):
-        savefile = EXP_PKL_LOCATION%self.basename +"%s.pkl"%(self.basename+self.expname)
+        savefile = EXP_PKL_LOCATION%self.basename +"%s_results.pkl"%(self.basename+self.expname)
         print 'Attempting to save to file:',savefile
         output = open(savefile, 'wb')
         pkl.dump(self.results, output,-1)
@@ -280,7 +464,7 @@ class Experiment:
         
         
     def load_results(self):
-        loadfile = EXP_PKL_LOCATION%self.basename +"%s.pkl"%(self.basename+self.expname)
+        loadfile = EXP_PKL_LOCATION%self.basename +"%s_results.pkl"%(self.basename+self.expname)
         pkl_file = open(loadfile, 'rb')
         self.results = pkl.load(pkl_file)
         pkl_file.close()
@@ -308,6 +492,7 @@ class Experiment:
     def get_dat_file(self,modifier=''):
         try:
             datfile = EXP_DAT_LOCATION%self.basename +"%s%s.dat"%(self.basename+self.expname,modifier)
+            print 'location =',datfile
         except:
             print 'Error with finding file'
             return 
@@ -322,12 +507,22 @@ class Experiment:
             #TODO: raise error - too many files
             print 'Too many files found: ',file
 
+    def get_voltage_trace(self):
+        data = np.loadtxt(self.get_dat_file()) 
+        t,v_soma = data[0,:],data[1,:]
+        return (t,v_soma)
+
     def calc_peak_iPhoto(self):
+        #if self.results['iPhoto'] is None:
+        #    self.results['iPhoto'] = {}
+        #self.results['iPhoto'][opsintype] = peak_iphoto
         for (opsin,values) in OPSINS_IPHOTO.iteritems():
             try:
-                self.calc_peak_iPhoto_opsin(opsin,values)
+                #TODO return correct iphoto
+                return self.calc_peak_iPhoto_opsin(opsin,values)
             except:
                 pass
+
 
     def calc_peak_iPhoto_opsin(self,opsintype,max_iphoto):
         """
@@ -335,14 +530,21 @@ class Experiment:
             max_iphoto
         
         """
-        data = np.loadtxt(self.get_dat_file('*_i%s'%opsintype)) 
-        i_photo = data[0,:]
+        i_photo = self.get_iPhoto_opsin(opsintype)
         if max_iphoto:
             peak_iphoto =  i_photo.max()
         else:   #no prizes for guessing correctly ... we calculate the min
             peak_iphoto = i_photo.min()
-        self.results['iPhoto_%s'%opsintype] = peak_iphoto
+        print 'peak iphoto = ',peak_iphoto
         return peak_iphoto
+    
+    
+    def get_iPhoto_opsin(self,opsintype):
+        data = np.loadtxt(self.get_dat_file('*_i%s'%opsintype)) 
+        ts = data[1:,0]
+        i_photo = data[1:,1]
+        return ts, i_photo
+        
 
     def calc_firingrate(self,**params):
         """
