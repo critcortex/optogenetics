@@ -16,9 +16,9 @@ OPSIN_EXP = 5e-4
 OPSIN_IRR = 10
 OPSIN_EXPDIST = 600
 
-# for expressions, array is [expression, pd, del_light, t_on, t_off, distance*]
+# for expressions, array is [expression, pd, del_light, t_on, t_off, distance*,num_pulses]
 # *NB that distance is only relevant for apical_distal or apical_proximal
-sampleexpression = [5e-4,10,600,200,350,600]
+sampleexpression = [5e-4,10,600,200,350,600,1]
 LOCATION_ALL = ['soma','basal','axon','apical_proximal','apical_distal']
 samplevalues = [[x,sampleexpression] for x in LOCATION_ALL]
 
@@ -171,9 +171,10 @@ class ExpSetup():
                 'ChR_times'         : ChR_expression,
                 'description'       : '',
                 'soma_stim_DC'      : 1.,
+                'iclamp_amp'        : 1.,
                 'iclamp_start'      : 100.,
                 'iclamp_duration'   : 100.,
-                'EPSPamp'           : 0.5
+                'EPSPamp'           : 0.0
               }
         
         defaultp['savedata'] =True
@@ -238,7 +239,7 @@ class ExpSetup():
         """
         self.main(expbase,params,runon=runon)                    
     
-    def run_frequency_range(self,expbase,freqs=[0.5,1,2.5,5,10],pulsewidth=10.,transient=200.,n_pulses=10,runon='local',params={}):
+    def run_frequency_range(self,expbase,freqs=[0.5,1,2.5,5,10],pulsewidth=10.,transient=200.,n_pulses=10,runon='local',params={},offset_phase=0.5):
         """
         
         Params:
@@ -249,7 +250,7 @@ class ExpSetup():
         conversion = 1000.
         for f in freqs:
             interstim_interval = 1./f*conversion #convert freq from /s to /ms
-            offset = interstim_interval/2
+            offset = interstim_interval*offset_phase
             t_off = interstim_interval - pulsewidth
             ChR_expression= [OPSIN_EXP,OPSIN_IRR,transient,pulsewidth,t_off,OPSIN_EXPDIST,n_pulses]
             NpHR_expression = [OPSIN_EXP,OPSIN_IRR,transient+offset,pulsewidth,t_off,OPSIN_EXPDIST,n_pulses]
