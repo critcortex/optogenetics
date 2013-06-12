@@ -43,8 +43,12 @@ def analyse():
     af.update_params({'tstop':tstop,'tstart':tstart})
     
     
-    exp_comp_list = [ ['_ie%s_NpHR_whole_ChR_none','ChR none,NpHR whole'],
-                      ['_ie%s_NpHR_none_ChR_none','ChR none,NpHR none']]
+    exp_comp_list = [ ['_freq%s_pw10_NpHR_whole_ChR_none','ChR2 none,NpHR whole'],
+                      ['_freq%s_pw10_NpHR_apical_ChR_none','ChR2 none,NpHR apical'],
+                      ['_freq%s_pw10_NpHR_none_ChR_apical','ChR2 apical,NpHR none'],
+                      ['_freq%s_pw10_NpHR_none_ChR_whole','ChR2 whole,NpHR none'],
+                      ['_freq%s_pw10_NpHR_apical_ChR_basal','ChR2 basal,NpHR apical'],
+                      ['_freq%s_pw10_NpHR_basal_ChR_apical','ChR2 apical,NpHR basal'] ]
                  
     expss = [ec[0] for ec in exp_comp_list]
     explabels = [ec[1] for ec in exp_comp_list]
