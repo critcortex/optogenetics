@@ -3,9 +3,9 @@ import run_analysis
 import numpy as np
 import sys
 
-expbase = '130612_increasing_irradiance_somacurr'
+expbase = '130618_increasing_irradiance_EPSP'
 
-current_amps = np.arange(0.,2.,.1) # 2.,.1
+current_amps = np.arange(0.,2.01,.1) 
 irradiances = np.arange(0,10.1,0.5)
 
 runon = 'cluster'
@@ -32,10 +32,12 @@ def run_experiments():
 
         for irr in irradiances:
             for amp in current_amps:
+                
                 params['experiment_type'] = 'BAC'
                 params['iclamp_amp']= amp
                 params['iclamp_start']= curr_on
                 params['iclamp_duration'] = curr_dur
+                
                 opsin_expression = [5e-4,irr,light_on,light_dur,light_dur,600,1] 
                 params.update({'NpHR_times':opsin_expression,'ChR_times':opsin_expression,'description':'_irr%.1f_Isoma%.1f'%(irr,amp)})
                 es.run_single_experiment(expbase, runon, params)
