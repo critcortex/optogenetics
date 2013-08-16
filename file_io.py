@@ -6,8 +6,8 @@ import logging
 import time
 
 OWNER = 'sjarvis1'
-EXECBASE = '~/exp/opsins/'
-EXPBASE  = '~/exp/opsins/experiments'
+EXECBASE = '~/exp/optogenetics/'
+EXPBASE  = '~/exp/optogenetics/experiments'
 
 SIM_TIME = 1
 
@@ -48,6 +48,9 @@ def finish_experiment(expname):
         os.system('mv %s%s %s'%(expname,k, basedir%(expname+'/'+v)))
         print "Moved %s%s to %s"%(expname,k,basedir%(expname+'/'+v))
 
+def get_exp_dat_location(expname):
+    return basedir%expname+'/'+filemaps['*dat']
+
 
 def get_logfile(expname):
     return '%s'%(expname)+'_expDescript.txt'
@@ -79,8 +82,7 @@ def savejob(expdict,filename):
     
     
 #--------------------------------------------------------------------------------------
-
-    
+   
 def get_pbs_header():
     txt = ("#PBS -N %s  \n"   #jobname
           "#PBS -e %s.err \n"  
@@ -102,3 +104,8 @@ def write_jdf_stimulation(expname):
     f.write(get_pbs_simcode()%(EXECBASE,expname))
     f.close()
     return expname+'_sim.jdf'
+
+
+if __name__ == '__main__':
+    if sys.argv[1] == 'clean':
+        finish_experiment(sys.argv[2])

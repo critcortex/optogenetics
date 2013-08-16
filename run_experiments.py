@@ -147,10 +147,12 @@ class SampleJob():
         #print 'running ', params['expname'], 'is going to sleep for ', sleeptime
         time.sleep(sleeptime)
         #return
-"""
 
 #----------------------------------------------
+
+"""
 class ExpSetup():    
+
     
     
         
@@ -170,11 +172,15 @@ class ExpSetup():
                 'NpHR_times'        : NpHR_expression,
                 'ChR_times'         : ChR_expression,
                 'description'       : '',
-                'soma_stim_DC'      : 1.,
-                'iclamp_amp'        : 1.,
-                'iclamp_start'      : 100.,
-                'iclamp_duration'   : 100.,
-                'EPSPamp'           : 0.0
+                'soma_stim_DC'      : 0., # 1.,
+                'iclamp_amp'        : 0., #1.,
+                'iclamp_start'      : 0., #100.,
+                'iclamp_duration'   : 0., #100.,
+                'iclamp_dist_amp'        : 0., #1.,
+                'iclamp_dist_start'      : 0., #100.,
+                'iclamp_dist_duration'   : 0., #100.,
+                'EPSP_amp'           : 0.0,
+                'EPSP_transient'    : 0., #200.,
               }
         
         defaultp['savedata'] =True
@@ -232,11 +238,26 @@ class ExpSetup():
                 
         return paramlist
 
-    
-    def run_single_experiment(self,expbase,runon='local',params={}):
+
+    def __check_dat_file_exists(self,expbase,params,fullloc=True):
         """
         
         """
+        dirloc = fio.get_exp_dat_location(expbase)
+        filename = expbase+params['description']+'_NpHR_%s_ChR_%s'%(params['NpHR_areas'].keys()[0],params['ChR_areas'].keys()[0])+'.dat'
+        #print dirloc+'/'+filename
+        return os.path.isfile(dirloc+'/'+filename)
+    
+    def run_single_experiment(self,expbase,runon='local',params={},checkdatexists=False):
+        """
+        
+        """
+        if checkdatexists:
+            if self.__check_dat_file_exists(expbase,params):
+                # if it already exists, we don't need to run
+                #print '---------------------------- would not run'
+                return 
+        #print 'would run ', expbase+params['description']
         self.main(expbase,params,runon=runon)                    
     
     def run_frequency_range(self,expbase,freqs=[0.5,1,2.5,5,10],pulsewidth=10.,transient=200.,n_pulses=10,runon='local',params={},offset_phase=0.5):
@@ -282,6 +303,7 @@ class ExpSetup():
         A simple self-contained test case that can be used without having to set up too many params.
         Should eventually be migrated to a JUnit-like testcase
         """
+        #TODO: move run_test_exp to testcase
         transient=100
         pulsewidth = 50
         t_off = 1

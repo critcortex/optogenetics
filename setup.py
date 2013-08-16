@@ -19,3 +19,4 @@ for f in folders:
     
 # run nrnivmodl
 call(['nrnivmodl'])
+# will create executable folder

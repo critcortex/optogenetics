@@ -18,11 +18,22 @@ opsin_dict['NpHR'] = {'ycoord':-10 , 'color':'#FFA500'} # orange
 
 class NeuronExperiment:
     
-    def setup(self,tstart=300,tstop=1500,proxpt=400,distpt=620,vinit=-80,squareamp=1.,imax=0.5):
+    def get_default_params(self):
+        params = { 'tstart': 300,
+                   'tstop' : 1500,
+                   'proxpt': 400,
+                   'distpt': 620,
+                   'vinit' :-80,
+                   'squareamp': 1.,
+                   'EPSP_transient':5,
+                   'imax': 0.5}
+        return params
+    
+    def setup(self,params): #tstart=300,tstop=1500,proxpt=400,distpt=620,vinit=-80,squareamp=1.,imax=0.5):
         """
         Sets up and initializes parameters and simulation environment, including cell morphology   
         """
-        global squareAmp, Imax, proximalpoint, distalpoint
+        global squareAmp, proximalpoint, distalpoint
         global risetau, decaytau, BACdt
         
         #====================== General files and tools =====================
@@ -49,24 +60,25 @@ class NeuronExperiment:
     
         #=================== settings ================================
         #v_init = vinit   # orig val: -80
-        BACdt = 5
+        
         
             
         #somatic pulse settings
-        squareAmp = squareamp  # original value: 1.9
+        squareAmp = params['squareamp']  # original value: 1.9
     
         #EPSP settings
         risetau = 0.5
         decaytau = 5
-        Imax = imax
+        BACdt = params['EPSP_transient']
+        
     
-        proximalpoint = proxpt
-        distalpoint = distpt
+        proximalpoint = params['proxpt']
+        distalpoint = params['distpt']
         self.set_proxdist_locations(proximalpoint,distalpoint)
     
         h('objref tstart')
-        h.tstart = tstart
-        h.tstop = tstop
+        h.tstart = params['tstart']
+        h.tstop = params['tstop']
     
     
     def set_proxdist_locations(self,proximalpoint,distalpoint):
@@ -118,11 +130,9 @@ class NeuronExperiment:
         # TODO: extend this to allow for concurrent stimulation types easily - possibly define as list or dict of stimuli  
         experiment_type = params['experiment_type']
         global somastimamp, EPSPamp
-        somastimamp = params['soma_stim_DC']
-        EPSPamp = params['EPSPamp']
-        # Type = [BAP | CaBurst | BAC]
-        
-        ##experiment_type = $1
+        somastimamp = params['iclamp_amp']
+        EPSPamp = params['EPSP_amp']
+
         print "Setting up for experiment type", experiment_type
         
         if (experiment_type=="BAP"):
@@ -144,6 +154,7 @@ class NeuronExperiment:
         
         else:
             print "WARNING: no experiment type was set"
+            print "Valid options: [BAP | CaBurst | BAC | opsinonly]"
             print "Assuming = BAP"
             
             #somastimamp = squareAmp
@@ -228,8 +239,10 @@ class NeuronExperiment:
         
         h('access L5PC.apic[distSite[0]]')
         h.st2 = h.IClamp(h.distSite[1])
-        h.st2.amp = 0
-        h('L5PC.apic[distSite[0]] { st2 } ')
+        setattr(h.st2, 'del', params['iclamp_dist_start'])
+        h.st2.dur = params['iclamp_dist_duration']
+        h.st2.amp = params['iclamp_dist_amp']
+        h('L5PC.apic[distSite[0]] { st2 } ') ########## TODO: extend and make this an active possibility to use
         
         
         # ------------------------ Dendritic EPSP-like current
@@ -287,13 +300,18 @@ class NeuronExperiment:
         """
         
         #======================== recording settings ============================
-        h('objref vsoma, vdend, proxClamp, vdend2, isoma, gsoma')
+        h('objref vsoma, vdend, proxClamp, vdend2, isoma, gsoma, isoma_k, isoma_na')
     
         h.vsoma = h.Vector()
         h.isoma = h.Vector()
         h('access L5PC.soma')
         h('cvode.record(&v(0.5),vsoma,tvec)')
         h.cvode.record(h.st1._ref_i,h.isoma,h.tvec)
+        h.isoma_k = h.Vector()
+        h.isoma_na = h.Vector()
+        h('cvode.record(&ik(.5),isoma_k,tvec)')
+        h('cvode.record(&ina(.5),isoma_na,tvec)')
+        
         # TODO: would also like to record conductances from soma, etc.
         #h.gsoma = h.Vector()
         #h.cvode.record(h.st1._ref_g,h.gsoma,h.tvec)
@@ -364,13 +382,12 @@ class NeuronExperiment:
     def save_data(self,expname,savedata=False,opsindict={}):
         if savedata:
             import numpy as np
-            mat = np.matrix([h.tvec,h.vsoma,h.vdend,h.vdend2,h.isoma])
+            mat = np.matrix([h.tvec,h.vsoma,h.vdend,h.vdend2,h.isoma,h.isoma_k,h.isoma_na])
             np.savetxt(expname+".dat",mat)
             
             if len(opsindict.keys())>0:
                 
                 # A horrible hack to get around python/NEURON conversion fun
-                # TODO: convert this to a method that uses pointers/dict in python - easier
                 """
                 h('objref list_i_opsin')
                 for opsin in opsindict.keys():
@@ -504,9 +521,11 @@ class NeuronExperiment:
        
      
     
-    def main(self,keydict):
-        print '\n'*2, '='*40, keydict['expname']
-        self.setup(tstart=keydict['tstart'],tstop=keydict['tstop'])
+    def main(self,exp_keydict):
+        print '\n'*2, '='*40, exp_keydict['expname']
+        keydict = self.get_default_params()
+        keydict.update(exp_keydict)
+        self.setup(keydict)#tstart=keydict['tstart'],tstop=keydict['tstop'])
         self.set_experiment_type(keydict)
         self.set_stimulus(keydict)
         self.add_optogenetics(keydict['opdict'])
