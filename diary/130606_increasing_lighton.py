@@ -4,9 +4,10 @@ import numpy as np
 import sys
 
 expbase = '130606_incr_lighton'
+expbase = '130624_incr_lighton'
 
 DEFAULT_FREQ = [0.5,1,1.5,2,2.5,3,4,5,6,7,8,9,10,15,20,30,35,40,45,50]
-current_amps = np.arange(0.,2.,.1)
+current_amps = np.arange(0.,2.01,.1)
 
 runon = 'cluster'
 n_pulses = 100
@@ -24,7 +25,11 @@ curr_on = 200
 curr_dur = 500
 light_off = 1000
 
-
+# for 130624_incr_lighton
+light_on = 100
+curr_on = 200
+curr_dur = 1000
+light_off = 1300
 
 es = run_experiments.ExpSetup()
 areas = es.get_areas_section()

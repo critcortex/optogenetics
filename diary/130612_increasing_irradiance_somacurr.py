@@ -49,6 +49,8 @@ def analyse():
     exp_comp_list = [['_irr%.1f_Isoma%.1f_'+'NpHR_%s_ChR_%s'%(exp[1],exp[0]),'ChR %s, NpHR %s'%(exp[0],exp[1])] for exp in explist ]
     print exp_comp_list
     
+    
+    
     '''
     exp_comp_list = [ ['_Isoma%.1f_NpHR_whole_ChR_none','ChR2 none,NpHR whole'],
                       ['_Isoma%.1f_NpHR_apical_ChR_none','ChR2 none,NpHR apical'],
@@ -65,22 +67,50 @@ def analyse():
     explabels = [ec[1] for ec in exp_comp_list]
     af.populate_expset(expbase,expss,explabels,[irradiances,current_amps])
     af.submenu_load()
-    af.submenu_plot(4, 'test')
-    return 
+    #return af
+    af.submenu_plot(4, 'test_vmax30')
+    
+    
+    
+    #af.submenu_plot(0, expbase+'FI_gain')
+    #return 
     #af.run_analysis_menu()
     
     
     #af.submenu_runFI()
     #af.submenu_plot(3, expbase+'_FI_compare')
     #af.submenu_Iphoto()
-    af.submenu_print()
-    af.submenu_save()
+    #af.submenu_print()
+    #af.submenu_save()
     
     
+def plot_gain():
+    
+    for irr in [1,5,10]:
+    
+        af = run_analysis.AnalyticFrame()
+        af.update_params({'tstart':light_on,'tstop':light_on+light_dur})
+        
+        exp_comp_list = [['_irr%.1f'%irr+'_Isoma%.1f_'+'NpHR_%s_ChR_%s'%(exp[1],exp[0]),'ChR %s, NpHR %s'%(exp[0],exp[1])] for exp in explist ]
+        print exp_comp_list
+        
+        expss = [ec[0] for ec in exp_comp_list]
+        explabels = [ec[1] for ec in exp_comp_list]
+        af.populate_expset(expbase,expss,explabels,[current_amps])
+        af.submenu_load()
+        
+        af.submenu_plot(5, expbase+'FI_gain_irr%.1f_varyFactor_exp%s%s_'%(irr,exp[0],exp[1]))
+        #af.submenu_plot(0, expbase+'FI_gain_irr%.1f'%irr)
     
         
+        
 if __name__ == '__main__':
-    if sys.argv[1] == 'run':
+    if len(sys.argv) <= 1:
+        pass
+    elif sys.argv[1] == 'run':
         run_experiments()        
     elif sys.argv[1] == 'analyse':
-        analyse()        
+        analyse()     
+    elif sys.argv[1] == 'plotgain':
+        plot_gain()
+    
