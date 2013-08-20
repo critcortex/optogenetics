@@ -18,6 +18,14 @@ opsin_dict['NpHR'] = {'ycoord':-10 , 'color':'#FFA500'} # orange
 
 class NeuronExperiment:
     
+    #TODO update so that any cell morphology
+    
+    def __init__(self):
+        h.load_file('stdlib.hoc', 'String') 
+        h.load_file('stdrun.hoc')
+        h.load_file("import3d.hoc")
+        self.stimuli = {}
+    
     def get_default_params(self):
         params = { 'tstart': 300,
                    'tstop' : 1500,
@@ -46,9 +54,7 @@ class NeuronExperiment:
         h.cvode.active(1)
     
         #=================== creating cell object ===========================
-        h.load_file('stdlib.hoc', 'String') 
-        h.load_file('stdrun.hoc')
-        h.load_file("import3d.hoc")
+        
         h('objref L5PC')
     
         h('strdef morphology_file')
@@ -207,6 +213,7 @@ class NeuronExperiment:
         global vec
         vec = {}
         
+        """
         # Determine location of distSite
         h('objref sl')
         h.sl = h.List()
@@ -223,7 +230,7 @@ class NeuronExperiment:
                 maxdiam = dd 
         h.distSite[0] = h.sl.object(j).x[0]
         h.distSite[1] = h.sl.object(j).x[1]
-        
+        """
         # ------------------------ Current pulses
         h('objref st1, st2')
         h.st1 = h.IClamp()
@@ -288,6 +295,65 @@ class NeuronExperiment:
     #    #h('hoc_vector.play(&stim.i,mytvec)')
     #    hoc_vector.play(stim._ref_amp, h.tvec, 1)
         print "-----------------------------------------------------------------------==============================================="
+        
+    def get_location(self,location):
+        #TODO: update so it returns proper section
+        return h.L5PC.soma[0]
+    
+        
+        
+    def __create_iclamp(self,params, location):
+        h.st1 = h.IClamp()
+        h.st1.loc(0.5, sec=self.get_location(location))
+        h.st1.amp = params['amp']
+        h.st1.dur = params['duration']
+        #st1.del = tstart --> error as del is reserved word in python
+        st1_delay = params['start']
+        setattr(h.st1, 'del', st1_delay)
+        
+        
+        
+    def __create_epsp(self,params, location):
+        h.syn1 = h.epsp(self.get_location(location))
+        h.syn1.tau0 = params['risetau']       
+        h.syn1.tau1 = params['decaytau']
+        h.syn1.onset = h.tstart + params['BACdt']
+        h.syn1.imax = params['EPSPamp']
+        #h('L5PC.apic[distSite[0]] { syn1 } ')
+    
+    def __create_spiketrain(self,params,location):
+        name = 'test'
+        """
+        self.syn[name] = h.ExpSyn(self.get_location(location))
+        self.stim[name] = h.Vector(np.sort(params['tstim'])) # Converting tstim into a NEURON vector (to play in NEURON)
+        self.vplay[name] = h.VecStim() # Creating play vectors to interface with NEURON
+        self.vplay[name].play(self.stim[name])  # Connecting vector to VecStim object to play them
+        self.netcon[name] = h.NetCon(self.vplay[name], self.syn[name]) # Building the netcon object to connect the stims and the synapses
+        self.netcon[name].weight[0] = params['w'] # Setting the individual weights
+        """
+        
+        self.syn[name] = h.ExpSyn(self.get_location(location))
+        self.stim[name] = h.Vector(np.sort(params['tstim'])) # Converting tstim into a NEURON vector (to play in NEURON)
+        self.vplay[name] = h.VecStim() # Creating play vectors to interface with NEURON
+        self.vplay[name].play(self.stim[name])  # Connecting vector to VecStim object to play them
+        self.netcon[name] = h.NetCon(self.vplay[name], self.syn[name]) # Building the netcon object to connect the stims and the synapses
+        self.netcon[name].weight[0] = params['w'] # Setting the individual weights
+    
+    # TODO: implement and replace for old set_stimulus
+    def new_set_stimulus(self,params):
+        
+        for (stimtype,stimparams) in params.iteritems():
+            for location in stimparams['locations']:
+                # work out what type of stimulus it is, create corresponding object
+                if stimtype == 'IClamp':
+                    stim = self.__create_iclamp(stimparams['stimparams'],location)
+                elif stimtype == 'EPSP': 
+                    stim = self.__create_epsp(stimparams['stimparams'],location)
+                elif stimtype == 'spiketrain':
+                    stim = self.__create_spiketrain(stimparams['stimparams'],location)
+                #TODO: update it so that stim is returned to an appropriate location
+    
+    
     
     def setup_record(self,opsindict={}):
         """
