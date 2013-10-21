@@ -5,6 +5,9 @@ import file_io as fio
 
 from neuron import h
 from nrn    import *
+
+import Neuron  
+
 import pylab
 #import matplotlib
 #matplotlib.use('Agg')
@@ -16,15 +19,50 @@ opsin_dict = {}
 opsin_dict['ChR'] = {'ycoord':-5 , 'color':'b'}
 opsin_dict['NpHR'] = {'ycoord':-10 , 'color':'#FFA500'} # orange
 
+
+# 
+# class L5PC:
+#     
+#     def __init__(self):
+#         h.load_file('stdlib.hoc') 
+#         h.load_file('stdrun.hoc')
+#         h.load_file("import3d.hoc")
+#         h.load_file("models/L5PCbiophys3.hoc")
+#         h.load_file("models/L5PCtemplate.hoc")
+#         
+#         self.cell = h.L5PCtemplate("morphologies/cell1.asc")
+#         
+#     def get_cell(self):
+#         return self.cell
+#     
+#     def get_soma(self):
+#         return self.cell.soma
+#     
+#     def get_basal(self):
+#         return self.cell.basal
+#     
+#     def get_apical(self):
+#         return self.cell.apic
+# 
+#     def get_axon(self):
+#         return self.cell.axon
+#     
+#     
+#     
+    
+    
+
 class NeuronExperiment:
     
-    #TODO update so that any cell morphology
     
     def __init__(self):
         h.load_file('stdlib.hoc', 'String') 
         h.load_file('stdrun.hoc')
         h.load_file("import3d.hoc")
         self.stimuli = {}
+        self.outputparams = self.get_default_outputparams()
+        self.params = self.get_default_params()
+        
     
     def get_default_params(self):
         params = { 'tstart': 300,
@@ -37,12 +75,27 @@ class NeuronExperiment:
                    'imax': 0.5}
         return params
     
-    def setup(self,params): #tstart=300,tstop=1500,proxpt=400,distpt=620,vinit=-80,squareamp=1.,imax=0.5):
+    def get_default_outputparams(self):
+        outputparams = {}
+        return outputparams
+    
+    def setup(self): #tstart=300,tstop=1500,proxpt=400,distpt=620,vinit=-80,squareamp=1.,imax=0.5):
+
+        """ 
+        Cell type
         """
-        Sets up and initializes parameters and simulation environment, including cell morphology   
+        print "Got to here"
+        __import__(self.params['cell'][0]) 
+        neuronclass = sys.modules[self.params['cell'][0]]
+        CellClass = getattr(neuronclass,self.params['cell'][1])
+        self.cell = CellClass(self.params['cell_params'])
+        
         """
-        global squareAmp, proximalpoint, distalpoint
-        global risetau, decaytau, BACdt
+        if self.params['cell'] is None:
+            self.cell = Neuron.L5PC()
+        else:
+            self.cell = self.params['cell']
+        """
         
         #====================== General files and tools =====================
         #h.load_file("nrngui.hoc")
@@ -52,7 +105,7 @@ class NeuronExperiment:
     
         h.cvode = h.CVode()
         h.cvode.active(1)
-    
+        """
         #=================== creating cell object ===========================
         
         h('objref L5PC')
@@ -63,112 +116,22 @@ class NeuronExperiment:
         h.load_file("models/L5PCbiophys3.hoc")
         h('load_file("models/L5PCtemplate.hoc")')
         h.L5PC = h.L5PCtemplate(h.morphology_file)
-    
-        #=================== settings ================================
-        #v_init = vinit   # orig val: -80
-        
-        
-            
-        #somatic pulse settings
-        squareAmp = params['squareamp']  # original value: 1.9
-    
-        #EPSP settings
-        risetau = 0.5
-        decaytau = 5
-        BACdt = params['EPSP_transient']
-        
-    
-        proximalpoint = params['proxpt']
-        distalpoint = params['distpt']
-        self.set_proxdist_locations(proximalpoint,distalpoint)
+        """
+        proximalpoint = self.params['proxpt']
+        distalpoint = self.params['distpt']
+        ######self.set_proxdist_locations(proximalpoint,distalpoint)
     
         h('objref tstart')
-        h.tstart = params['tstart']
-        h.tstop = params['tstop']
-    
-    
-    def set_proxdist_locations(self,proximalpoint,distalpoint):
-        h('objref sl')
-        h('double distSite[2]')
-        h('double proxSite[2]')
-        h.sl = h.List()
-        maxdiam = 0
+        h.tstart = self.params['tstart']
+        h.tstop = self.params['tstop']
         
-        h.sl = h.L5PC.locateSites("apic",distalpoint)
-        axsites = int(h.sl.count())
-        j = 0
-        for i in range(axsites):
-            dd1 = h.sl.object(i).x[1]
-            dd = h.L5PC.apic[int(h.sl.object(i).x[0])](dd1).diam
-            if (dd > maxdiam) :
-                j = i
-                maxdiam = dd 
-        h.distSite[0] = h.sl.object(j).x[0]
-        h.distSite[1] = h.sl.object(j).x[1]
+        self.tag_locations()
         
         
-        h.sl = h.L5PC.locateSites("apic",proximalpoint)
-        axsites = int(h.sl.count())
-        j = 0
-        
-        for i in range(axsites):
-            dd1 = h.sl.object(i).x[1]
-            dd = h.L5PC.apic[int(h.sl.object(i).x[0])](dd1).diam
-            if (dd > maxdiam):
-                j = i
-                maxdiam = dd 
-            
-        h.proxSite[0] = h.sl.object(j).x[0]
-        h.proxSite[1] = h.sl.object(j).x[1]
+    def set_experiment_type(self):
+        pass
     
-    
-    
-    def set_experiment_type (self,params):
-        """
-        Define the type of experiment type to be performed.
-        Possible values are:
-            BAP (default)      current injected at soma
-            CaBurst            EPSP-like event injected at apical location
-            BAC                current injected at soma and EPSP events
-            opsinonly          no current or EPSP injection; intended to examine the solo contribution of opsins
-        
-        """
-        # TODO: extend this to allow for concurrent stimulation types easily - possibly define as list or dict of stimuli  
-        experiment_type = params['experiment_type']
-        global somastimamp, EPSPamp
-        somastimamp = params['iclamp_amp']
-        EPSPamp = params['EPSP_amp']
 
-        print "Setting up for experiment type", experiment_type
-        
-        if (experiment_type=="BAP"):
-            #somastimamp = squareAmp
-            EPSPamp = 0
-        
-        elif (experiment_type=="CaBurst"):
-            somastimamp = 0
-            #EPSPamp = Imax*3
-        
-        elif (experiment_type=="BAC"):
-            pass
-            #somastimamp = squareAmp
-            #EPSPamp = Imax
-            
-        elif (experiment_type=="opsinonly"):
-            somastimamp = 0
-            EPSPamp = 0
-        
-        else:
-            print "WARNING: no experiment type was set"
-            print "Valid options: [BAP | CaBurst | BAC | opsinonly]"
-            print "Assuming = BAP"
-            
-            #somastimamp = squareAmp
-            EPSPamp = 0
-        
-        
-    
-    
     def add_optogenetics (self,opsindict):
         """
         Loads relevant hoc files for opsins in revelant sections of neuron. 
@@ -200,120 +163,198 @@ class NeuronExperiment:
                     h(ss)
                 else:
                     print "No locations specified for opsin : ",opsin
+   
+    # TODO: implement and replace for old set_stimulus
+    def new_set_stimulus(self):
+        """
         
+        """
+        print self.params
+        stimtypes = [key for key in self.params.keys() if key.startswith('stim_') and self.params[key]]
+        print '\nThe following stimulus types were seen:', stimtypes, '\n'
+        for k in stimtypes:
+            print self.params[k.replace('stim_','')]
+            self.outputparams[k] = {}
+            for stimulus in self.params[k.replace('stim_','')]:
+                print 'going to run: ',"getattr(self,'_create_%s')(stimulus)"%k.replace('stim_',''),' where stimulus = ', stimulus
+                #print stimulus,'--------------------------------'
+                getattr(self,'_create_%s'%k.replace('stim_',''))(stimulus)
+        print self.outputparams
+        
+    def get_ids_distance(self,section,distances=(100,200),cell=None):
+        if cell is None:
+            try:
+                cell = self.cell
+            except:
+                print "Function requires cell"
+                return
+        ids = cell.locateSites(section, distances[1])
     
-    def set_stimulus (self,params) :
-        """
-        Set stimuli objects:
-            st1        IClamp object at soma
-            st2        IClamp object at distal location on apical dendrite (distSite)
-            syn1       EPSP event at distal location on apical dendrite (distSite)
-        """
-        #======================== stimulus settings ============================
-        global vec
-        vec = {}
-        
-        """
-        # Determine location of distSite
-        h('objref sl')
-        h.sl = h.List()
-        h('double distSite[2]')
-        h.sl = h.L5PC.locateSites("apic",distalpoint)
-        axsites = int(h.sl.count())
-        maxdiam = 0
-        j = 0
-        for i in range(axsites):
-            dd1 = h.sl.object(i).x[1]
-            dd = h.L5PC.apic[int(h.sl.object(i).x[0])](dd1).diam
-            if (dd > maxdiam) :
-                j = i
-                maxdiam = dd 
-        h.distSite[0] = h.sl.object(j).x[0]
-        h.distSite[1] = h.sl.object(j).x[1]
-        """
-        # ------------------------ Current pulses
-        h('objref st1, st2')
-        h.st1 = h.IClamp()
-        h.st1.loc(0.5, sec=h.L5PC.soma[0])
-        h.st1.amp = somastimamp
-        #st1.del = tstart --> error as del is reserved word in python
-        st1_delay = params['iclamp_start']
-        st1_duration = params['iclamp_duration']
-        setattr(h.st1, 'del', st1_delay)
-        h.st1.dur = st1_duration
-        h('L5PC.soma st1')
-        
-        
-        h('access L5PC.apic[distSite[0]]')
-        h.st2 = h.IClamp(h.distSite[1])
-        setattr(h.st2, 'del', params['iclamp_dist_start'])
-        h.st2.dur = params['iclamp_dist_duration']
-        h.st2.amp = params['iclamp_dist_amp']
-        h('L5PC.apic[distSite[0]] { st2 } ') ########## TODO: extend and make this an active possibility to use
-        
-        
-        # ------------------------ Dendritic EPSP-like current
-        # added to segments on apical dendrite that are distal to <distalpoint>
-        h('objref syn1,isyn, tvec')
-        
-        h.isyn = h.Vector()
-        h.tvec = h.Vector()
-        
-        h.syn1 = h.epsp(h.distSite[1])
-        h.syn1.tau0 = risetau       
-        h.syn1.tau1 = decaytau   
-        h.syn1.onset = h.tstart + BACdt  
-        h.syn1.imax = EPSPamp
-        h('L5PC.apic[distSite[0]] { syn1 } ')
-        
-        h.cvode.record(h.syn1._ref_i,h.isyn,h.tvec)
-        
-        #    
-    #    # Locate the electrode at the center of the soma
-    #    h('objref stim, hoc_vector, mytvec')
-    #    tmppy_tvec = range(int(h.tstop))
-    #    #h.mytvec = h.Vector(2)
-    #    #h.mytvec.x[0] = 0
-    #    #h.mytvec.x[1] = h.tstop
-    #    h.mytvec = h.Vector(tmppy_tvec)
-    #    VecT = h.Vector([0, 1000])
-    #    
-    #    stim = h.IClamp()
-    #    stim.loc(0.5, sec=h.L5PC.soma[0])
-    #    stim.dur = 1e9
-    #    
-    #    # Setting recording paradigm
-    #    #h.stim.delay = 100
-    #    #h.stim.amp = 100
-    #    #h.stim.dur = 400
-    #    
-    #    import numpy.random as nprnd
-    #    stimvector = nprnd.randint(1000, size=2000)
-    #    print stimvector[:10]
-    #    print tmppy_tvec[:10]
-    #    hoc_vector = h.Vector(stimvector)
-    #    #h('hoc_vector.play(&stim.i,mytvec)')
-    #    hoc_vector.play(stim._ref_amp, h.tvec, 1)
-        print "-----------------------------------------------------------------------==============================================="
-        
+    
+    def set_stimulus(self):
+        pass
+    
+       
     def get_location(self,location):
         #TODO: update so it returns proper section
-        return h.L5PC.soma[0]
+        #return h.L5PC.soma[0]
+        #return self.cell.__getattribute__(location)
+        return getattr(self.cell, 'get_%s'%location)
+
+    def get_section(self,section,id=0):
+        try:
+            return getattr(self.cell, 'get_%s'%section)()[id]
+        except TypeError:
+            return getattr(self.cell, 'get_%s'%section)()
+        except:
+            print "Fail - could not get_section %s"%section
     
+    def tag_locations(self):
+        #TODO: implement
+        """
+        Go through and populate Python reference/pointers to given sections in our NEURON morphology
+        Warns if ids or distances are invalid
         
+        Input:
+            names        list of pointer names i.e. ['Site1','Site2']
+            sections     list of sections
+            ids          list of tuples (ids,sitex) i.e. [(0,0.5),(36,0.97)]. Should be same length as name
+
+        Returns:
+            zipped list of valid names and ids
+        """
+        print 'TAGGING LOCATIONS'
+        try:
+            names = self.params['mark_loc']['names']
+            sections = self.params['mark_loc']['sections']
+            ids = self.params['mark_loc']['ids']
+        except:
+            print 'No names, sections and ids included to mark for locations'
+            return
+            
+                    
+        marked_loc = {}
+        """
+        i=-1
+        try:
+            i = sections.index('soma')
+        except:
+            pass
+        if i>-1:
+            #process singular: soma
+            print sections
+            print self.cell.get_soma()[0]
+            marked_loc[names[i]] = [sections[i], self.cell.get_soma()[0],0.5]
+            # remove soma from names/sections
+            sections.pop(i)
+            names.pop(i)
+            ids.pop(i)
+        """    
+        print 'we have find for', names, sections
         
-    def __create_iclamp(self,params, location):
+        for (i,name) in enumerate(names):
+            marked_loc[name] = [sections[i], self.get_section(sections[i],ids[i][0]), ids[i][1]]
+            #marked_loc[name] = [sections[i], self.get_section(sections[i])()[ids[i][0]], ids[i][1]]
+        
+        print 'Have hopefully TAGGED LOCATIONS -->', marked_loc    
+        self.outputparams['tagged_locations'] = marked_loc
+         
+    
+    def _create_spiketrains(self, stparams):
+        print '\n'*5, 'params = ', stparams
+        tstims = stparams['tstims']
+        el = stparams['el']
+        weights = stparams['weights']
+        locations = stparams['locations']
+        print 'tagged locations = ', self.outputparams['tagged_locations']
+        
+        for i, tstim in enumerate(tstims):
+            tagloc = self.outputparams['tagged_locations'][locations[i]]
+            print tagloc, locations[i]
+            expsyn = self.add_ExpSyn(section=locations[i], position=tagloc[2], name='Stream'+str(i), tstim=tstim, w=weights[i]*el)
+            self.outputparams['stim_spiketrains'][locations[i]] = expsyn
+            print 'Added ExpSyn=Stream%g at position %s'%(i,str(locations[i])),tstim
+        
+    
+    def add_ExpSyn(self, section='soma', position=0.5, name='default', tstim=[50], w=.001):
+        """
+        Create/replace an Expsyn synapse on a given section which is active at the time in tstim
+
+        Comments
+        --------
+        The sort command is here to make sure that tstim are in the right order. This method
+        requires the pre-compiling of vecstim.mod by NEURON.
+
+        Function supplied by R. Caze 2013
+        """
+        expsyn = {}
+        expsyn['syn'] = h.ExpSyn()
+        location =self.outputparams['tagged_locations'][section][1]
+        expsyn['syn'].loc(position,sec=location)
+        expsyn['stim'] = h.Vector(np.sort(tstim)) # Converting tstim into a NEURON vector (to play in NEURON)
+        expsyn['vplay'] = h.VecStim() # Creating play vectors to interface with NEURON
+        expsyn['vplay'].play(expsyn['stim'])  # Connecting vector to VecStim object to play them
+        expsyn['netcon'] = h.NetCon(expsyn['vplay'], expsyn['syn']) # Building the netcon object to connect the stims and the synapses
+        expsyn['netcon'].weight[0] = w # Setting the individual weights
+        return expsyn
+        
+        """
+        self.syn, self.stim, self.vplay, self.netcon = {},{},{},{}
+        #self.syn[name] = h.ExpSyn(self.get_location(section)(position)) #?
+        self.syn[name] = h.ExpSyn()
+        #self.syn[name].loc(0.5,sec=self.get_location(section)().Section())
+        self.syn[name].loc(0.5,sec=self.cell.get_soma()[0])
+        self.stim[name] = h.Vector(np.sort(tstim)) # Converting tstim into a NEURON vector (to play in NEURON)
+        self.vplay[name] = h.VecStim() # Creating play vectors to interface with NEURON
+        self.vplay[name].play(self.stim[name])  # Connecting vector to VecStim object to play them
+        self.netcon[name] = h.NetCon(self.vplay[name], self.syn[name]) # Building the netcon object to connect the stims and the synapses
+        self.netcon[name].weight[0] = w # Setting the individual weights
+        """
+        
+    def _create_iclamp(self,params):
+        print '\n'*5, 'iclamp = params = ', params
+        tag_location = params['location']
+        location =self.outputparams['tagged_locations'][tag_location][1]
+        iclamp = h.IClamp()
+        iclamp.loc(0.5, sec=location)
+        iclamp.amp = params['amp']
+        iclamp.dur = params['duration']
+        #st1.del = tstart --> error as del is reserved word in python
+        setattr(iclamp, 'del', params['tstim'])
+        self.outputparams['stim_iclamp'][tag_location] = iclamp
+        
+                
+    def _create_epsp(self,params):
+        print '\n'*5, 'epsp params = ', params        
+        tag_location = params['location']
+        location =self.outputparams['tagged_locations'][tag_location][1]
+        epsp = h.epsp()
+        epsp.loc(0.5, sec=location)
+        epsp.tau0 = params['risetau']       
+        epsp.tau1 = params['decaytau']
+        epsp.onset = params['tstim'] + params['BACdt']
+        epsp.imax = params['EPSPamp']
+        self.outputparams['stim_epsp'][tag_location] = epsp
+
+
+    
+    def old_create_iclamp(self,params, location=None):
+        print '\n'*5, 'iclamp = params = ', params
+        pass
         h.st1 = h.IClamp()
         h.st1.loc(0.5, sec=self.get_location(location))
+        print '\n'*5, 'params = ', params
         h.st1.amp = params['amp']
         h.st1.dur = params['duration']
         #st1.del = tstart --> error as del is reserved word in python
-        st1_delay = params['start']
+        st1_delay = params['tstim']
         setattr(h.st1, 'del', st1_delay)
         
         
         
-    def __create_epsp(self,params, location):
+    def old_create_epsp(self,params, location=None):
+        print '\n'*5, 'epsp params = ', params        
+        pass
         h.syn1 = h.epsp(self.get_location(location))
         h.syn1.tau0 = params['risetau']       
         h.syn1.tau1 = params['decaytau']
@@ -321,41 +362,22 @@ class NeuronExperiment:
         h.syn1.imax = params['EPSPamp']
         #h('L5PC.apic[distSite[0]] { syn1 } ')
     
-    def __create_spiketrain(self,params,location):
-        name = 'test'
-        """
-        self.syn[name] = h.ExpSyn(self.get_location(location))
-        self.stim[name] = h.Vector(np.sort(params['tstim'])) # Converting tstim into a NEURON vector (to play in NEURON)
-        self.vplay[name] = h.VecStim() # Creating play vectors to interface with NEURON
-        self.vplay[name].play(self.stim[name])  # Connecting vector to VecStim object to play them
-        self.netcon[name] = h.NetCon(self.vplay[name], self.syn[name]) # Building the netcon object to connect the stims and the synapses
-        self.netcon[name].weight[0] = params['w'] # Setting the individual weights
-        """
+
+    def _record_v(self):
+        pass
+        #h.st1._ref_v
+    
+    def _record_i(self):
+        pass
+    
+    def _record_g(self):
+        pass
+        #h.st1._ref_g
+    
+    def _record_x(self):
+        pass
         
-        self.syn[name] = h.ExpSyn(self.get_location(location))
-        self.stim[name] = h.Vector(np.sort(params['tstim'])) # Converting tstim into a NEURON vector (to play in NEURON)
-        self.vplay[name] = h.VecStim() # Creating play vectors to interface with NEURON
-        self.vplay[name].play(self.stim[name])  # Connecting vector to VecStim object to play them
-        self.netcon[name] = h.NetCon(self.vplay[name], self.syn[name]) # Building the netcon object to connect the stims and the synapses
-        self.netcon[name].weight[0] = params['w'] # Setting the individual weights
-    
-    # TODO: implement and replace for old set_stimulus
-    def new_set_stimulus(self,params):
-        
-        for (stimtype,stimparams) in params.iteritems():
-            for location in stimparams['locations']:
-                # work out what type of stimulus it is, create corresponding object
-                if stimtype == 'IClamp':
-                    stim = self.__create_iclamp(stimparams['stimparams'],location)
-                elif stimtype == 'EPSP': 
-                    stim = self.__create_epsp(stimparams['stimparams'],location)
-                elif stimtype == 'spiketrain':
-                    stim = self.__create_spiketrain(stimparams['stimparams'],location)
-                #TODO: update it so that stim is returned to an appropriate location
-    
-    
-    
-    def setup_record(self,opsindict={}):
+    def setup_record(self):
         """
         Set up recording devices and structures.
         Recording:
@@ -364,42 +386,81 @@ class NeuronExperiment:
             
         
         """
+        """
+        self.rec_t = h.Vector()
+        self.rec_t.record(h._ref_t)
+        # Record Voltage
+        self.rec_v = h.Vector()
+        self.rec_v.record(self.cell.soma(0.5)._ref_v)
+        """
+        #Record time
+        self.rec_t = h.Vector()
+        self.rec_t.record(h._ref_t)
         
-        #======================== recording settings ============================
-        h('objref vsoma, vdend, proxClamp, vdend2, isoma, gsoma, isoma_k, isoma_na')
-    
-        h.vsoma = h.Vector()
-        h.isoma = h.Vector()
-        h('access L5PC.soma')
-        h('cvode.record(&v(0.5),vsoma,tvec)')
-        h.cvode.record(h.st1._ref_i,h.isoma,h.tvec)
-        h.isoma_k = h.Vector()
-        h.isoma_na = h.Vector()
-        h('cvode.record(&ik(.5),isoma_k,tvec)')
-        h('cvode.record(&ina(.5),isoma_na,tvec)')
+        # Now go through and start recording voltage/current/etc
+        record_vrefs = {}
+        for loc in self.params['record_loc']['v']:
+            sec = self.outputparams['tagged_locations'][loc][1]
+            posn = self.outputparams['tagged_locations'][loc][2]
+            record_vrefs['v_%s'%loc] = h.Vector()
+            record_vrefs['v_%s'%loc].record(sec(posn)._ref_v)
+            """
+            tmpi = h.Vector()
+            tmpi.record(sec(0.5)._ref_ina)
+            tmpi2 = h.Vector()
+            tmpi2.record(sec(0.5)._ref_ik)
+            #record_vrefs['g_%s'%loc] = h.Vector()
+            #record_vrefs['g_%s'%loc].record(sec(0.5)._ref_v)
+            """
+            print('Added v_rec for location=%s'%loc)
+        self.outputparams['v_rec'] = record_vrefs
+            
+#         
+#         
+#         
+#         #======================== recording settings ============================
+#         h('objref vsoma, vdend, proxClamp, vdend2, isoma, gsoma, isoma_k, isoma_na')
+#     
+#         h.vsoma = h.Vector()
+#         h.isoma = h.Vector()
+#         h('access L5PC.soma')
+#         h('cvode.record(&v(0.5),vsoma,tvec)')
+#         #h.cvode.record(h.st1._ref_i,h.isoma,h.tvec)
+#         h.isoma_k = h.Vector()
+#         h.isoma_na = h.Vector()
+#         h('cvode.record(&ik(.5),isoma_k,tvec)')
+#         h('cvode.record(&ina(.5),isoma_na,tvec)')
+#         
+#         
+#         """
+#         # TODO: would also like to record conductances from soma, etc.
+#         #h.gsoma = h.Vector()
+#         #h.cvode.record(h.st1._ref_g,h.gsoma,h.tvec)
+#         
+#         # Record voltage at distal point on apical tree
+#         h.vdend = h.Vector()
+#         h('access L5PC.apic[distSite[0]]')
+#         h.cvode.record(h.L5PC.apic[int(h.distSite[0])](h.distSite[1])._ref_v,h.vdend,h.tvec)
+#         
+#     
+#         # Record voltage at proximal point on apical tree
+#         h('access L5PC.apic[proxSite[0]]')
+#         h.vdend2 = h.Vector()
+#         h.cvode.record(h.L5PC.apic[int(h.proxSite[0])](h.proxSite[1])._ref_v,h.vdend2,h.tvec)
+#     
+#         # Following lines are only useful when we're wanting to plot location of proxSite
+#     #    h('access L5PC.apic[proxSite[0]]')
+#     #    h.proxClamp = h.IClamp(h.proxSite[1])
+#     #    h.proxClamp.amp = 0
+#     #    h('L5PC.apic[proxSite[0]] { proxClamp }')
+#         """
+#         
+#         
         
-        # TODO: would also like to record conductances from soma, etc.
-        #h.gsoma = h.Vector()
-        #h.cvode.record(h.st1._ref_g,h.gsoma,h.tvec)
+        """
         
-        # Record voltage at distal point on apical tree
-        h.vdend = h.Vector()
-        h('access L5PC.apic[distSite[0]]')
-        h.cvode.record(h.L5PC.apic[int(h.distSite[0])](h.distSite[1])._ref_v,h.vdend,h.tvec)
-        
-    
-        # Record voltage at proximal point on apical tree
-        h('access L5PC.apic[proxSite[0]]')
-        h.vdend2 = h.Vector()
-        h.cvode.record(h.L5PC.apic[int(h.proxSite[0])](h.proxSite[1])._ref_v,h.vdend2,h.tvec)
-    
-        # Following lines are only useful when we're wanting to plot location of proxSite
-    #    h('access L5PC.apic[proxSite[0]]')
-    #    h.proxClamp = h.IClamp(h.proxSite[1])
-    #    h.proxClamp.amp = 0
-    #    h('L5PC.apic[proxSite[0]] { proxClamp }')
-    
         # for each opsin, include vector for corresponding photocurrent
+        opsindict = self.params['opdict']
         h('access L5PC.soma')
         for (opsin,opsinval) in opsindict.iteritems():
             print 'testing for %s'%opsin, opsinval
@@ -408,25 +469,8 @@ class NeuronExperiment:
                 h('i_%s = new Vector()'%opsin)
                 h('cvode.record(&%s[0].i%s,i_%s,tvec)'%(opsin,opsin,opsin)) 
                 print 'Recording from i_%s'%opsin
-    
-    
-    def setup_plot (self):
-        
-        ## ARTEFACT OF NEURON CODE. Note that we're now plotting using python matplot methods instead
-        pass
-        #h('objref gV, gI, s')
-    
-        #h.s = h.Shape(shape=h.L5PC.all)
-        #h.s.color_list(h.L5PC.axonal,2,2)
-        #h.s.color_list(h.L5PC.somatic,5)
-        #h.s.color_list(h.L5PC.basal,4)
-        #h.s.color_list(h.L5PC.apical,1)
-        #h.s.point_mark(h.st2,2)
-        ##h.s.point_mark(h.proxClamp,3)
-        #h.s.show(0)
-        
-    
-    
+                
+        """ # TODO remove once debugged
     
     def simulate_exp(self):
         
@@ -440,12 +484,51 @@ class NeuronExperiment:
         """
         opsinvalue = opsindict[opsin]
         """
-        print opsin, opsinvalue[0][0],'======================================================= is Opsin present? ', 
-        bb = opsinvalue[0][0] is not None
-        print bb
+        #print opsin, opsinvalue[0][0],'======================================================= is Opsin present? ', 
+        #bb = opsinvalue[0][0] is not None
+        #print bb
         return opsinvalue[0][0] is not None
         
-    def save_data(self,expname,savedata=False,opsindict={}):
+        
+    def num_recording_areas(self,params,typerec):
+        return len(params['record_loc'][typerec])
+        
+    def save_data(self):#,expname,savedata=False,opsindict={}):
+        expname = self.params['expname']
+        if not self.params['savedata']:
+            return
+        
+        import numpy as np
+        # save recorded voltages, currents, etc.
+        
+        #mat = np.matrix([self.rec_t])
+        mat = np.zeros((self.num_recording_areas(self.params,'v')+1,int(len(self.rec_t))))
+        mat[0,:] = self.rec_t
+        for i in range(self.num_recording_areas(self.params, 'v')):
+            mat[i+1,:] = self.outputparams['v_rec']['v_%s'%self.params['record_loc']['v'][i]]
+
+        np.savetxt(expname+"_v.dat",mat)
+        # TODO also save tag names as header info
+        
+        if len(self.params['opdict'].keys())==0:
+            return
+        
+        for opsin in self.params['opdict'].keys():
+            if not self.is_opsin_present(self.params['opdict'][opsin],opsin):
+                continue
+            h('objref savdata')
+            h('savdata = new File()')
+            h('savdata.wopen("%s_i%s.dat")'%(expname,opsin))
+            h('objref tempmatrix')
+            h('tempmatrix = new Matrix()')
+            h('tempmatrix.resize(tvec.size(),2)')
+            h('tempmatrix.setcol(0, tvec)')
+            h('tempmatrix.setcol(1, i_%s)'%opsin)
+            h('tempmatrix.fprint(savdata, " %g")')
+            h('savdata.close()')
+        
+    
+    def old_save_data(self,expname,savedata=False,opsindict={}):
         if savedata:
             import numpy as np
             mat = np.matrix([h.tvec,h.vsoma,h.vdend,h.vdend2,h.isoma,h.isoma_k,h.isoma_na])
@@ -498,17 +581,53 @@ class NeuronExperiment:
         y = np.array([yoffset+yval,yoffset+yval])
         ax.fill_between(x,y-2,y+2,color=color)
     
-    def run_plots(self,params):
+    def _get_vector(self,lineinfo):
+        name = lineinfo[0]
+        electrode = lineinfo[1]
+        return self.outputparams['%s_rec'%electrode]['%s_%s'%(electrode,name)]
+    
+    def run_plots(self):
+        lw = 2
+        
+        for figid in self.params['plot'].keys():
+            pylab.figure()
+            
+            for line in self.params['plot'][figid]:
+                if len(line)==3: #means we had a line description
+                    pylab.plot(self.rec_t,self._get_vector(line),line[2])
+                else:
+                    pylab.plot(self.rec_t,self._get_vector(line))
+            pylab.xlim(self.rec_t[0]-20,self.rec_t[-1]+20)
+            ax = pylab.gca()
+            for loc, spine in ax.spines.iteritems():
+                if loc in ['left','bottom']:
+                    spine.set_position(('outward',5))
+                    ax.tick_params(direction='out')
+                elif loc in ['right','top']:
+                    spine.set_color('none') 
+            pylab.xlabel('time (ms)')
+            
+            if self.params['expname'] is not None:
+                savename = '%s_%s.png'%(self.params['expname'],figid)
+                pylab.savefig(savename)
+                print "Saved figure under %s*.png"%savename
+                pylab.close('all')
+            else:
+                pylab.show()
+            
+    
+    def old_run_plots(self,params):
         """
         Generates plots for voltage and current at soma, distal and proximal locations on apical dendrites
         """
         lw = 2
         
+        
         # Plot voltage at soma and dendrites (apical proximal and distal)
         pylab.figure(1)
         pylab.plot(h.tvec,h.vsoma,lw=lw,c='k',label='v_soma')
-        pylab.plot(h.tvec,h.vdend,lw=lw,c='r',label='v_dend')
-        pylab.plot(h.tvec,h.vdend2,lw=lw,c='b',label='v_dend2')
+        #pylab.plot(h.tvec,h.vdend,lw=lw,c='r',label='v_dend')
+        #pylab.plot(h.tvec,h.vdend2,lw=lw,c='b',label='v_dend2')
         pylab.xlim(h.tstart-20,h.tstop+20)
         pylab.ylim(-120,40)
         # If optogenetics were included, draw blocks for times that illumination occurred in appropriate colours 
@@ -535,6 +654,7 @@ class NeuronExperiment:
         pylab.xlabel('time (ms)')
         pylab.ylabel('V (mV)')
         
+        """
         # Plot currents at soma and i_syn
         pylab.figure(2)
         pylab.plot(h.tvec,h.isyn,lw=lw,c='g',label='i_syn')
@@ -562,45 +682,35 @@ class NeuronExperiment:
         pylab.legend()
         pylab.xlabel('time (ms)')
         pylab.ylabel('I (nA)')
-        
+        """
         
         if params['expname'] is not None:
             savename = params['expname']
             pylab.figure(1)
             pylab.savefig(savename+'_voltage.png')
-            pylab.figure(2)
-            pylab.savefig(savename+'_current.png')
+            #pylab.figure(2)
+            #pylab.savefig(savename+'_current.png')
             print "Saved figures under %s*.png"%savename
             pylab.close('all')
         else:
             pylab.show()
             
-            
-    
-    def debug(self):
-        print "tvec range = ",h.tvec.min(),h.tvec.max()
-        print "isyn range = ",h.isyn.min(),h.isyn.max()
-        print "vdend range = ",h.vdend.min(),h.vdend.max()
-        print "vdend2 range = ",h.vdend2.min(),h.vdend2.max()
-        print "vsoma range =", h.vsoma.min(), h.vsoma.max()
-        print "isoma range = ",h.isoma.min(),h.isoma.max()
+
        
-     
     
     def main(self,exp_keydict):
         print '\n'*2, '='*40, exp_keydict['expname']
-        keydict = self.get_default_params()
-        keydict.update(exp_keydict)
-        self.setup(keydict)#tstart=keydict['tstart'],tstop=keydict['tstop'])
-        self.set_experiment_type(keydict)
-        self.set_stimulus(keydict)
-        self.add_optogenetics(keydict['opdict'])
-        self.setup_record(keydict['opdict'])
-        self.setup_plot()
+        
+        self.params.update(exp_keydict)
+        self.setup()
+        self.set_experiment_type()
+        self.set_stimulus()
+        self.new_set_stimulus()
+        self.add_optogenetics(self.params['opdict'])
+        self.setup_record()
         self.simulate_exp()
-        self.save_data(keydict['expname'],keydict['savedata'],keydict['opdict'])
-        self.run_plots(keydict)
-        self.debug()
+        self.save_data()
+        self.run_plots()
     
     
     def run_from_file(self,paramfilename):

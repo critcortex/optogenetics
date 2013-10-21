@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+#import run_stimulation
 import run_stimulation
 import file_io as fio
 import os, sys
@@ -151,11 +152,7 @@ class SampleJob():
 #----------------------------------------------
 
 """
-class ExpSetup():    
-
-    
-    
-        
+class ExpSetup():
         
     def get_areas_section(self):
         return areaSections
@@ -167,11 +164,17 @@ class ExpSetup():
     def get_default_params(self):
         defaultp= {  'expname'           : None,
                 'experiment_type'   : experiment_type,
+                # neuron params
+                'cell'              : None,
+                'cell_description'  : '',
+                'cell_params'       : {},
+                # optogen params
                 'NpHR_areas'        : areasNp,
                 'ChR_areas'         : areasCh,
                 'NpHR_times'        : NpHR_expression,
                 'ChR_times'         : ChR_expression,
                 'description'       : '',
+                # old params that are kept in for compatibility
                 'soma_stim_DC'      : 0., # 1.,
                 'iclamp_amp'        : 0., #1.,
                 'iclamp_start'      : 0., #100.,
@@ -181,6 +184,32 @@ class ExpSetup():
                 'iclamp_dist_duration'   : 0., #100.,
                 'EPSP_amp'           : 0.0,
                 'EPSP_transient'    : 0., #200.,
+                # and their new, improved counterparts
+                'stim_iclamp'       : False,
+                'iclamp'            : [{'amp':1.,
+                                        'tstim':200.,
+                                        'duration':10.,
+                                        'location':'soma'},],
+                'stim_epsp'         : False,
+                'epsp'              : [{'tstim':200,
+                                        'EPSPamp':0.1,
+                                        'risetau':0.5,
+                                        'decaytau':5.,
+                                        'BACdt': 0.,
+                                        'location':'soma'}],
+                'stim_spiketrains'  : False,
+                'spiketrains'       : [{'tstims': [[200, 600],[400, 600]], 
+                                       'locations': [['soma', 0.5]], 
+                                       'weights':[1.,1.], 
+                                       'el': 0.02}],
+                'mark_loc'          : {'names':[],'sections':[], 'distances':[],'ids':[]},
+                'record_loc'        : {'v': [],
+                                       'i': [],
+                                       'na': [],
+                                       'k':[],
+                                       'g':[],
+                                       'i_ChR':[],
+                                       'i_NpHR':[]}
               }
         
         defaultp['savedata'] =True
@@ -189,10 +218,6 @@ class ExpSetup():
         defaultp['tstop'] = 4000
         defaultp['num_threads'] = 4
         return defaultp
-        
-
-
-        
         
 
     
