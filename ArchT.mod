@@ -3,10 +3,10 @@
 NEURON  {
     POINT_PROCESS ArchT
     ELECTRODE_CURRENT i
-    RANGE Er, flux, g, gph, gv, iArchT 
+    RANGE irradiance, flux, g, gph, gv, iArchT 
     RANGE gbar, gpump                        
     RANGE e1, k20, k3dark, k3light 
-    RANGE delay, pulsewidth, interpulse_interval, n_pulses   
+    RANGE lightdelay, pulsewidth, interpulse_interval, n_pulses   
 }
 
 UNITS {
@@ -18,8 +18,8 @@ UNITS {
 PARAMETER {
 
 : illumination  (it is changed via hoc file)
-   Er = 1	            :(mW/mm2)	 irradaince 
-   delay = 30                (ms)
+   irradiance = 1	            :(mW/mm2)	  
+   lightdelay = 30                (ms)
    pulsewidth = 100               (ms) <0, 1e9>  : duration of ON phase
    interpulse_interval = 50               (ms) <0, 1e9>  : duration of OFF phase
    n_pulses = 1                                : how many to deliver
@@ -88,7 +88,7 @@ INITIAL {
   	i = 0
   	tally = n_pulses
   	if (tally > 0) {
-	      net_send(delay, 1)
+	      net_send(lightdelay, 1)
       	      on = 0
 	      tally = tally - 1
   	}
@@ -119,7 +119,7 @@ NET_RECEIVE (w) {
           if (on == 0) {
           
              : turn it on   
-             flux = Er 
+             flux = irradiance 
              on = 1
              
              : prepare to turn it off
