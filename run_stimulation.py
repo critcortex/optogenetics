@@ -7,6 +7,7 @@ from neuron import h
 from nrn    import *
 
 import Neuron  
+import opsin as oplib
 
 import pylab
 #import matplotlib
@@ -89,7 +90,7 @@ class NeuronExperiment:
         neuronclass = sys.modules[self.params['cell'][0]]
         CellClass = getattr(neuronclass,self.params['cell'][1])
         self.cell = CellClass(self.params['cell_params'])
-        
+
         """
         if self.params['cell'] is None:
             self.cell = Neuron.L5PC()
@@ -107,7 +108,7 @@ class NeuronExperiment:
         h.cvode.active(1)
         """
         #=================== creating cell object ===========================
-        
+        """
         h('objref L5PC')
     
         h('strdef morphology_file')
@@ -116,7 +117,8 @@ class NeuronExperiment:
         h.load_file("models/L5PCbiophys3.hoc")
         h('load_file("models/L5PCtemplate.hoc")')
         h.L5PC = h.L5PCtemplate(h.morphology_file)
-        """
+        
+        
         proximalpoint = self.params['proxpt']
         distalpoint = self.params['distpt']
         ######self.set_proxdist_locations(proximalpoint,distalpoint)
@@ -131,7 +133,27 @@ class NeuronExperiment:
     def set_experiment_type(self):
         pass
     
-
+    def add_optogenetics_test(self):
+        """
+        print '....... ADDING TO SOMA ------------------'
+        opsintype = 'ChR'
+        opsinProtein = getattr(h,opsintype)()
+        try:
+            opsinProtein.loc(0.5, sec=self.cell.get_soma()[0])
+        except:
+            opsinProtein.loc(0.5, sec=self.cell.get_soma())
+        
+        print self.cell.get_num_segments('apical')
+        print self.cell.get_num_segments('dend0')
+        print '....... ADDED TO SOMA ------------------', '\n'*20
+        """
+        
+        
+        opsinExp = oplib.Opsin() 
+        oplist = opsinExp.express_opsin(self.cell, self.params)
+        self.outputparams['expressed_opsin'] = oplist
+        
+        
     def add_optogenetics (self,opsindict):
         """
         Loads relevant hoc files for opsins in revelant sections of neuron. 
@@ -512,7 +534,7 @@ class NeuronExperiment:
         
         if len(self.params['opdict'].keys())==0:
             return
-        
+        """
         for opsin in self.params['opdict'].keys():
             if not self.is_opsin_present(self.params['opdict'][opsin],opsin):
                 continue
@@ -526,7 +548,7 @@ class NeuronExperiment:
             h('tempmatrix.setcol(1, i_%s)'%opsin)
             h('tempmatrix.fprint(savdata, " %g")')
             h('savdata.close()')
-        
+        """ # TODO opsin remove
     
     def old_save_data(self,expname,savedata=False,opsindict={}):
         if savedata:
@@ -569,6 +591,23 @@ class NeuronExperiment:
                     h('tempmatrix.fprint(savdata, " %g")')
                     h('savdata.close()')
     
+    
+    def plot_optogenetics(self):
+        
+        if self.params.has_key('opsindict'):
+            print self.params['opsindict']
+            for (opsin,oplocations) in self.params['opsindict'].iteritems():
+                for (oploc,opexp) in oplocations.iteritems():
+                    print opexp
+                    if oploc.lower() == 'none':
+                        continue
+                    for pulsenum in range(opexp['n_pulses']):                
+                        pulse_start = opexp['lightdelay']+pulsenum*(opexp['pulsewidth']+opexp['interpulse_interval'])
+                        self.plot_optogenetic(opsin,pulse_start,pulse_start+opexp['pulsewidth'],yoffset=40)
+                    # once we've plotted an activation for one area, that should be sufficient i.e. we don't need to plot apical *and* soma, only the first 
+                    # TODO: think how to extend this to allow for different areas to be indicated i.e. ChR in soma vs ChR in apical dendritic arbor
+                    break
+    
     def plot_optogenetic(self,opsin_type,ton,toff,yoffset):
         """ 
         Plots lines at top of figure to indicate when each opsin was active 
@@ -576,6 +615,7 @@ class NeuronExperiment:
         """
         yval = opsin_dict[opsin_type]['ycoord']
         color = opsin_dict[opsin_type]['color']
+        print 'plotting opsin --> ', opsin_type, color
         ax = pylab.gca()
         x = [ton,toff]
         y = np.array([yoffset+yval,yoffset+yval])
@@ -597,6 +637,7 @@ class NeuronExperiment:
                     pylab.plot(self.rec_t,self._get_vector(line),line[2])
                 else:
                     pylab.plot(self.rec_t,self._get_vector(line))
+            print "\nMax was ", self._get_vector(line).max(),'\n'
             pylab.xlim(self.rec_t[0]-20,self.rec_t[-1]+20)
             ax = pylab.gca()
             for loc, spine in ax.spines.iteritems():
@@ -607,6 +648,8 @@ class NeuronExperiment:
                     spine.set_color('none') 
             pylab.xlabel('time (ms)')
             
+            self.plot_optogenetics()
+            
             if self.params['expname'] is not None:
                 savename = '%s_%s.png'%(self.params['expname'],figid)
                 pylab.savefig(savename)
@@ -614,6 +657,8 @@ class NeuronExperiment:
                 pylab.close('all')
             else:
                 pylab.show()
+        
+  
             
     
     def old_run_plots(self,params):
@@ -696,7 +741,8 @@ class NeuronExperiment:
             pylab.show()
             
 
-       
+    def print_stats(self):
+        print self.outputparams['v_rec']
     
     def main(self,exp_keydict):
         print '\n'*2, '='*40, exp_keydict['expname']
@@ -706,11 +752,13 @@ class NeuronExperiment:
         self.set_experiment_type()
         self.set_stimulus()
         self.new_set_stimulus()
-        self.add_optogenetics(self.params['opdict'])
+        self.add_optogenetics_test()
+        #self.add_optogenetics(self.params['opdict'])
         self.setup_record()
         self.simulate_exp()
         self.save_data()
         self.run_plots()
+        self.print_stats()
     
     
     def run_from_file(self,paramfilename):

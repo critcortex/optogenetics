@@ -1,9 +1,9 @@
 from neuron import nrn, h, hclass, run, init
 #from nrn    import *
 import sys
+from LFPy import Cell
 
-
-class Neuron:
+class Neuron(Cell):
     
     def __init__(self):
         raise NotImplementedError( "Should have implemented init method to load neuron" )
@@ -25,10 +25,10 @@ class Neuron:
     
     def locateSites(self,section,distance):
         raise NotImplementedError( "Not implemented")
-    
-    def get_domains(self):
-        raise NotImplementedError( "Not implemented")
-        
+       
+    def get_subdomains(self):
+        # TODO we could actually automate this so that we can pull the names out of this.allsecnames
+        return []
 
 
 class L5PC(Neuron):
@@ -36,7 +36,7 @@ class L5PC(Neuron):
     def get_default_params(self):
         return {'model':'L5PCbiophys3.hoc','cellmorph':'cell1.asc'}
    
-    def __init__(self,inparams): #TODO make model and cellmorph star params
+    def __init__(self,inparams={}): #TODO make model and cellmorph star params
         params = self.get_default_params()
         params.update(inparams)
         h.load_file('stdlib.hoc') 
@@ -46,6 +46,8 @@ class L5PC(Neuron):
         h.load_file("models/L5PCtemplate.hoc")
         
         self.cell = h.L5PCtemplate("morphologies/%s"%params['cellmorph'])
+        self._create_sectionlists()
+        self.populate_sectionlists()
         
     def get_cell(self):
         return self.cell
@@ -54,7 +56,7 @@ class L5PC(Neuron):
         return self.cell.soma
     
     def get_basal(self):
-        return self.cell.basal
+        return self.cell.dend
     
     def get_apical(self):
         return self.cell.apic
@@ -67,7 +69,33 @@ class L5PC(Neuron):
     
     def locateSites(self, sectionString, distance):
         return self.cell.locateSites(sectionString,distance)
+    
+    def populate_sectionlists(self):
+        self.domainlists = {}
+        for subd in self.get_subdomains():
+            self.domainlists[subd] = h.SectionList()
+        
+        for (i,sec) in enumerate(self.allseclist):
+            try:               
+                # this is hacky but we have to do it this way, as a typical name is L5Template[3].apic[34] 
+                matched_domain = [subd for subd in self.get_subdomains() if sec.name().find(subd)>=0][0]
+                self.domainlists[matched_domain].append(sec=sec)
+                #print 'Added another to subdomain %s'%(matched_domain)
+            except:
+                print '%s does not seem to belong to any subdomain'%sec.name()
+    
+    def get_num_segments(self,section):
+        """ SUPERCEDED BY LFPy.Cell.
+        """
+        try:
+            count = getattr(self.cell, 'nSec%s'%(section.capitalize()))
+            return int(count)
+        except:
+            print 'Section %s unknown; returning 0 for section count'%section
+            return 0 
 
+    def get_subdomains(self):
+        return ['soma', 'axon', 'apic','dend']
 
 # Wrappers from Andrew Davidson neuronpy modified and commented by Romain Caze
 # They enable to interface NEURON and Python more easily.
@@ -172,8 +200,6 @@ class Section(nrn.Section):
         nothing, but change the self.spikecount
 
         """
-
-
         self.spiketimes = h.Vector()
         self.spikecount = h.APCount(0.5, sec=self)
         self.spikecount.thresh = threshold
@@ -191,6 +217,9 @@ class SimpleNeuron(Neuron):
     def get_soma(self):
         return self.soma
     
+    def get_dend(self,dend_id):
+        return getattr(self,'dend%g'%dend_id)
+
     
 class SimpleBipolar(SimpleNeuron):
     
@@ -217,6 +246,7 @@ class SimpleBipolar(SimpleNeuron):
         params = self.get_default_params()
         params.update(inparams)
         self.cell = self.create_bipolar(params)
+        self.subdomains = ['soma',  'dend0','dend1'] 
         self.params = params
         
     def create_bipolar(self,params):
@@ -234,6 +264,21 @@ class SimpleBipolar(SimpleNeuron):
     
     def get_basal(self):
         return self.dend1
+    
+    def get_num_segments(self,section):
+        return self.subdomains.count(section)
+
+    def get_subdomains(self):
+        return self.subdomains   
+    
+    def populate_sectionlists(self):
+        self.domainlists = {}
+        for subd in self.get_subdomains():
+            self.domainlists[subd] = h.SectionList()
+        
+        self.domainlists['soma'].append(sec=self.soma)
+        self.domainlists['dend0'].append(sec=self.dend0)
+        self.domainlists['dend1'].append(sec=self.dend1)
         
         
 class SimpleUnipolar(SimpleNeuron):
@@ -261,6 +306,7 @@ class SimpleUnipolar(SimpleNeuron):
         params = self.get_default_params()
         params.update(inparams)
         self.cell = self.create_unipolar(params)
+        self.subdomains = ['soma',  'dend0']   
         self.params = params
         
     def create_unipolar(self,params):
@@ -274,4 +320,19 @@ class SimpleUnipolar(SimpleNeuron):
     def get_apical(self):
         return self.dend0
 
+    def get_num_segments(self,section):
+        return self.subdomains.count(section)
+
+    def get_subdomains(self):
+        return self.subdomains   
+
+    def populate_sectionlists(self):
+        self.domainlists = {}
+        for subd in self.get_subdomains():
+            self.domainlists[subd] = h.SectionList()
+        
+        self.domainlists['soma'].append(sec=self.soma)
+        self.domainlists['dend0'].append(sec=self.dend0)
+    
+    
 #TODO : could extend this to SimpleNPolar (i.e. n number of child dendrites))
