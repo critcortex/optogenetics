@@ -9,14 +9,20 @@ OWNER = 'sjarvis1'
 EXECBASE = '~/exp/optogenetics/'
 EXPBASE  = '~/exp/optogenetics/experiments'
 
-SIM_TIME = 1
+DEFAULT_WALLTIME = 3
 
 basedir = 'experiments/%s'
-subfolders = ['img','dat','pkl','out']
+subfolders = ['img','dat','pkl','out','gdf']
 filemaps = {    '*png' : 'img',
                 '*dat' : 'dat',
                 '*pkl' : 'pkl',
-                '*.o'  : 'out'}
+                '*jdf' : 'out',
+                '*gdf' : 'gdf',
+                '*.err': 'out',
+                '*.out'  : 'out'}
+
+unpackmap = { '*pkl' : 'pkl',
+           '*jdf' : 'out'}
 
 def setup_experiment(expname):
     """
@@ -34,6 +40,11 @@ def setup_experiment(expname):
     print "Creating expDescript file for experiment %s"%(expname)
     logname = get_logfile(expname)
     logging.basicConfig(filename=logname,level=logging.INFO)
+
+
+def getexps():
+    return os.walk(os.path.expanduser(EXPBASE)).next()[1]
+
     
 
 def finish_experiment(expname):
@@ -47,6 +58,11 @@ def finish_experiment(expname):
         #shutil.move('./%s%s'%(expname,k),  basedir%(expname+'/'+v))
         os.system('mv %s%s %s'%(expname,k, basedir%(expname+'/'+v)))
         print "Moved %s%s to %s"%(expname,k,basedir%(expname+'/'+v))
+        
+def unpack(expname):
+    for (k,v) in unpackmap.iteritems():
+        os.system('mv %s/%s .'%(basedir%(expname+'/'+v),k))
+        print 'Unpacked %s/%s to .'%(basedir%(expname+'/'+v),k)
 
 def get_exp_dat_location(expname):
     return basedir%expname+'/'+filemaps['*dat']
@@ -80,6 +96,25 @@ def savejob(expdict,filename):
     pickle.dump(expdict, f) 
     print 'Job saved: %s.pkl'%filename
     
+
+def loadresults(filename):
+    try:
+        f = open('%s_output.pkl'%filename, 'r') 
+        expdict = pickle.load(f)
+        print 'Job loaded: %s_output.pkl'%filename
+        return expdict
+    except:
+        print 'Could not load output for job:',filename
+        raise Exception('Unloaded job')
+    
+    
+def saveresults(expdict,filename):
+    f = open('%s_output.pkl'%filename, 'w')
+    pickle.dump(expdict, f) 
+    print 'Job saved: %s_output.pkl'%filename
+    
+    
+
     
 #--------------------------------------------------------------------------------------
    
@@ -100,12 +135,32 @@ def get_pbs_simcode():
    
 def write_jdf_stimulation(expname):
     f = open('%s_sim.jdf'%expname, 'w')
-    f.write(get_pbs_header()%(expname+'_sim',expname,expname,SIM_TIME))
+    f.write(get_pbs_header()%(expname+'_sim',expname,expname,DEFAULT_WALLTIME))
     f.write(get_pbs_simcode()%(EXECBASE,expname))
     f.close()
     return expname+'_sim.jdf'
 
-
 if __name__ == '__main__':
-    if sys.argv[1] == 'clean':
-        finish_experiment(sys.argv[2])
+    """
+    Params
+    ------
+    python file_io.py clean 
+        Cleans all experiments 
+    python file_io.py clean <expname>
+        Cleans files for expname only
+    """
+    
+    if len(sys.argv) > 1:
+        if sys.argv[1] == 'clean':
+            if len(sys.argv) == 2:
+                for exp in getexps():
+                    finish_experiment(exp)
+            else:
+                finish_experiment(sys.argv[2])
+        elif sys.argv[1] == 'unpack':
+            unpack(sys.argv[2])
+        
+        
+        
+        
+        

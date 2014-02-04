@@ -209,7 +209,8 @@ class ExpSetup():
                                        'k':[],
                                        'g':[],
                                        'i_ChR':[],
-                                       'i_NpHR':[]}
+                                       'i_NpHR':[]},
+                'plot'              : {}
               }
         
         defaultp['savedata'] =True
@@ -282,7 +283,7 @@ class ExpSetup():
                 # if it already exists, we don't need to run
                 #print '---------------------------- would not run'
                 return 
-        #print 'would run ', expbase+params['description']
+        print 'would run ', expbase+params['description']
         self.main(expbase,params,runon=runon)                    
     
     def run_frequency_range(self,expbase,freqs=[0.5,1,2.5,5,10],pulsewidth=10.,transient=200.,n_pulses=10,runon='local',params={},offset_phase=0.5):

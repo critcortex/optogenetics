@@ -3,8 +3,8 @@
 
 import file_io as fio
 
-from neuron import h
-from nrn    import *
+from neuron import h, run, init
+#from nrn    import *
 
 import Neuron  
 import opsin as oplib
@@ -12,9 +12,10 @@ import opsin as oplib
 import pylab
 #import matplotlib
 #matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import numpy as np
 import sys
+import time
 
 opsin_dict = {}
 opsin_dict['ChR'] = {'ycoord':-5 , 'color':'b'}
@@ -85,7 +86,7 @@ class NeuronExperiment:
         """ 
         Cell type
         """
-        print "Got to here"
+        #print "Got to here"
         __import__(self.params['cell'][0]) 
         neuronclass = sys.modules[self.params['cell'][0]]
         CellClass = getattr(neuronclass,self.params['cell'][1])
@@ -100,6 +101,7 @@ class NeuronExperiment:
         
         #====================== General files and tools =====================
         #h.load_file("nrngui.hoc")
+        """
     
         #====================== cvode =======================================
         h('objref cvode')
@@ -117,15 +119,18 @@ class NeuronExperiment:
         h.load_file("models/L5PCbiophys3.hoc")
         h('load_file("models/L5PCtemplate.hoc")')
         h.L5PC = h.L5PCtemplate(h.morphology_file)
+        """
         
-        
-        proximalpoint = self.params['proxpt']
-        distalpoint = self.params['distpt']
+        #proximalpoint = self.params['proxpt']
+        #distalpoint = self.params['distpt']
         ######self.set_proxdist_locations(proximalpoint,distalpoint)
     
         h('objref tstart')
         h.tstart = self.params['tstart']
+        #h('objref tstop')
         h.tstop = self.params['tstop']
+        #h.dt = 0.01
+        h.t = 0
         
         self.tag_locations()
         
@@ -133,7 +138,7 @@ class NeuronExperiment:
     def set_experiment_type(self):
         pass
     
-    def add_optogenetics_test(self):
+    def add_optogenetics(self):
         """
         print '....... ADDING TO SOMA ------------------'
         opsintype = 'ChR'
@@ -154,7 +159,7 @@ class NeuronExperiment:
         self.outputparams['expressed_opsin'] = oplist
         
         
-    def add_optogenetics (self,opsindict):
+    def add_optogenetics_old (self,opsindict):
         """
         Loads relevant hoc files for opsins in revelant sections of neuron. 
         Params: 
@@ -191,17 +196,17 @@ class NeuronExperiment:
         """
         
         """
-        print self.params
+        #print self.params
         stimtypes = [key for key in self.params.keys() if key.startswith('stim_') and self.params[key]]
         print '\nThe following stimulus types were seen:', stimtypes, '\n'
         for k in stimtypes:
-            print self.params[k.replace('stim_','')]
+            #print self.params[k.replace('stim_','')]
             self.outputparams[k] = {}
             for stimulus in self.params[k.replace('stim_','')]:
-                print 'going to run: ',"getattr(self,'_create_%s')(stimulus)"%k.replace('stim_',''),' where stimulus = ', stimulus
+                print 'going to run: ',"getattr(self,'_create_%s')(stimulus)"%k.replace('stim_','') #,' where stimulus = ', stimulus
                 #print stimulus,'--------------------------------'
                 getattr(self,'_create_%s'%k.replace('stim_',''))(stimulus)
-        print self.outputparams
+        #print self.outputparams
         
     def get_ids_distance(self,section,distances=(100,200),cell=None):
         if cell is None:
@@ -219,17 +224,37 @@ class NeuronExperiment:
        
     def get_location(self,location):
         #TODO: update so it returns proper section
-        #return h.L5PC.soma[0]
-        #return self.cell.__getattribute__(location)
         return getattr(self.cell, 'get_%s'%location)
-
+    """
     def get_section(self,section,id=0):
+        #TODO convert to using section lists
+        print section, id
         try:
+            print 'A'
             return getattr(self.cell, 'get_%s'%section)()[id]
-        except TypeError:
-            return getattr(self.cell, 'get_%s'%section)()
+        except :
+            print 'B'
+            try:
+                return getattr(self.cell, 'get_%s'%section)()
+            except:
+                print "Fail - could not get_section %s"%section
+    """
+    def get_section(self,location,id=0):
+        #print 'get_section:'
+        #print self.cell.get_subdomains()
+        #print location, id
+        #ls = self.cell.get_subdomain_list('soma')
+        #print ls.hname()
+        #if True:
+        try:
+            #print 'A', location
+            ls = self.cell.get_subdomain_list(location)
+            tmp = ls.object(id)
+            #print tmp.hname()
+            return tmp
         except:
-            print "Fail - could not get_section %s"%section
+            print sys.exc_info()[0]
+            #print 'B'        
     
     def tag_locations(self):
         #TODO: implement
@@ -246,6 +271,7 @@ class NeuronExperiment:
             zipped list of valid names and ids
         """
         print 'TAGGING LOCATIONS'
+        self.cell.print_section_info()
         try:
             names = self.params['mark_loc']['names']
             sections = self.params['mark_loc']['sections']
@@ -275,27 +301,39 @@ class NeuronExperiment:
         print 'we have find for', names, sections
         
         for (i,name) in enumerate(names):
-            marked_loc[name] = [sections[i], self.get_section(sections[i],ids[i][0]), ids[i][1]]
-            #marked_loc[name] = [sections[i], self.get_section(sections[i])()[ids[i][0]], ids[i][1]]
-        
-        print 'Have hopefully TAGGED LOCATIONS -->', marked_loc    
+            print '---------------------------------------',i
+            if type(ids[i][0])==int:
+                print 'Got id and section'
+                marked_loc[name] = [sections[i], self.get_section(sections[i],ids[i][0]), ids[i][1], ids[i][0]]
+            elif type(ids[i][0])==str:
+                # DANGER WILL ROBINSON!
+                #string is a function call to select ... so 
+                print 'Got dynamic selection - ', ids[i]
+                secid = getattr(self.cell,ids[i][0])(**ids[i][1])[0]
+                print secid
+                marked_loc[name] = [sections[i], self.get_section(sections[i],secid[0]),  secid[2], secid[0]]
+            else:
+                print type(ids[i][0]), ids[i][0]
+                
+            print '---asdasd------------------------------------'
+        print 'Have hopefully tagged all locations', marked_loc
         self.outputparams['tagged_locations'] = marked_loc
          
     
     def _create_spiketrains(self, stparams):
-        print '\n'*5, 'params = ', stparams
+        #print '\n'*5, 'params = ', stparams
         tstims = stparams['tstims']
         el = stparams['el']
         weights = stparams['weights']
         locations = stparams['locations']
-        print 'tagged locations = ', self.outputparams['tagged_locations']
+        #print 'tagged locations = ', self.outputparams['tagged_locations']
         
         for i, tstim in enumerate(tstims):
             tagloc = self.outputparams['tagged_locations'][locations[i]]
-            print tagloc, locations[i]
+            #print tagloc, locations[i]
             expsyn = self.add_ExpSyn(section=locations[i], position=tagloc[2], name='Stream'+str(i), tstim=tstim, w=weights[i]*el)
             self.outputparams['stim_spiketrains'][locations[i]] = expsyn
-            print 'Added ExpSyn=Stream%g at position %s'%(i,str(locations[i])),tstim
+            print 'Added ExpSyn=Stream%g at position %s'%(i,str(locations[i])),'with first 5 times: ',tstim[:5],'...'
         
     
     def add_ExpSyn(self, section='soma', position=0.5, name='default', tstim=[50], w=.001):
@@ -312,6 +350,7 @@ class NeuronExperiment:
         expsyn = {}
         expsyn['syn'] = h.ExpSyn()
         location =self.outputparams['tagged_locations'][section][1]
+        print 'Adding for name=%s, section=%s'%(name,section)
         expsyn['syn'].loc(position,sec=location)
         expsyn['stim'] = h.Vector(np.sort(tstim)) # Converting tstim into a NEURON vector (to play in NEURON)
         expsyn['vplay'] = h.VecStim() # Creating play vectors to interface with NEURON
@@ -319,19 +358,7 @@ class NeuronExperiment:
         expsyn['netcon'] = h.NetCon(expsyn['vplay'], expsyn['syn']) # Building the netcon object to connect the stims and the synapses
         expsyn['netcon'].weight[0] = w # Setting the individual weights
         return expsyn
-        
-        """
-        self.syn, self.stim, self.vplay, self.netcon = {},{},{},{}
-        #self.syn[name] = h.ExpSyn(self.get_location(section)(position)) #?
-        self.syn[name] = h.ExpSyn()
-        #self.syn[name].loc(0.5,sec=self.get_location(section)().Section())
-        self.syn[name].loc(0.5,sec=self.cell.get_soma()[0])
-        self.stim[name] = h.Vector(np.sort(tstim)) # Converting tstim into a NEURON vector (to play in NEURON)
-        self.vplay[name] = h.VecStim() # Creating play vectors to interface with NEURON
-        self.vplay[name].play(self.stim[name])  # Connecting vector to VecStim object to play them
-        self.netcon[name] = h.NetCon(self.vplay[name], self.syn[name]) # Building the netcon object to connect the stims and the synapses
-        self.netcon[name].weight[0] = w # Setting the individual weights
-        """
+
         
     def _create_iclamp(self,params):
         print '\n'*5, 'iclamp = params = ', params
@@ -398,16 +425,77 @@ class NeuronExperiment:
     
     def _record_x(self):
         pass
+    
         
     def setup_record(self):
         """
         Set up recording devices and structures.
-        Recording:
-            vsoma    voltage from soma
-            vdend    voltage from distal location on apical dendrites
-            
+
+        """
+        #Record time
+        self.rec_t = h.Vector()
+        self.rec_t.record(h._ref_t)
+        #print self.outputparams.keys()
+        # Now go through and start recording voltage/current/etc
+        for (recordable,locations) in self.params['record_loc'].iteritems():
+            record_dict = {}
+            for loc in locations:
+                sec = self.outputparams['tagged_locations'][loc][1]
+                posn = self.outputparams['tagged_locations'][loc][2]
+                tmprec = h.Vector()
+                #print recordable
+                if recordable == 'iphoto':
+                    #fnrec = getattr(sec,'%s'%recordable)
+                    for (opsin,v) in self.outputparams['expressed_opsin'].iteritems():
+                        """
+                        print opsin,v
+                        print v.hname() 
+                        #firstobj =  v.o(0)
+                        print dir(v)
+                        print dir(v.o(0))
+                        print dir(v.o(41))
+                        print dir(v.o(210))
+                        print dir(v.o(641))
+                        print v.o(0).iChR
+                        """
+                        # TODO: should make this dynamic ... 
+                        if opsin == 'ChR':
+                            tmprec.record(h.ref(v.o(0).iChR)) # record in soma
+                        elif opsin == 'NpHR':
+                            tmprec.record(h.ref(v.o(0).iNpHR))
+                        else:
+                            print 'Could not record photocurrent for %s'%opsin
+                        #print tmprec
+                        #h('tmprec.record(&ChR[0].iChR,i_ChR,rec_t)')
+                        break
+                       
+                        #tmp = getattr(firstobj,'iNpHR')
+                    #tmprec.record(tmp)  
+                else:
+                    fnrec = getattr(sec(posn),'_ref_%s'%recordable)
+                    tmprec.record(fnrec)
+                record_dict['%s_%s'%(recordable,loc)] = tmprec
+                
+    
+                print('Added %s_rec for location=%s _____________ as %s_%s'%(recordable,loc,recordable,loc))
+            self.outputparams['%s_rec'%recordable] = record_dict
+            #print self.outputparams
+        
+        
         
         """
+        # for each opsin, include vector for corresponding photocurrent
+        opsindict = self.params['opdict']
+        h('access L5PC.soma')
+        for (opsin,opsinval) in opsindict.iteritems():
+            print 'testing for %s'%opsin, opsinval
+            if self.is_opsin_present(opsinval,opsin):
+                h('objref i_%s'%opsin)
+                h('i_%s = new Vector()'%opsin)
+                h('cvode.record(&%s[0].i%s,i_%s,tvec)'%(opsin,opsin,opsin)) 
+                print 'Recording from i_%s'%opsin
+                
+        """ # TODO remove once debugged
         """
         self.rec_t = h.Vector()
         self.rec_t.record(h._ref_t)
@@ -415,27 +503,19 @@ class NeuronExperiment:
         self.rec_v = h.Vector()
         self.rec_v.record(self.cell.soma(0.5)._ref_v)
         """
-        #Record time
-        self.rec_t = h.Vector()
-        self.rec_t.record(h._ref_t)
         
-        # Now go through and start recording voltage/current/etc
-        record_vrefs = {}
-        for loc in self.params['record_loc']['v']:
-            sec = self.outputparams['tagged_locations'][loc][1]
-            posn = self.outputparams['tagged_locations'][loc][2]
-            record_vrefs['v_%s'%loc] = h.Vector()
-            record_vrefs['v_%s'%loc].record(sec(posn)._ref_v)
-            """
+        
+        """
             tmpi = h.Vector()
             tmpi.record(sec(0.5)._ref_ina)
             tmpi2 = h.Vector()
             tmpi2.record(sec(0.5)._ref_ik)
             #record_vrefs['g_%s'%loc] = h.Vector()
             #record_vrefs['g_%s'%loc].record(sec(0.5)._ref_v)
-            """
-            print('Added v_rec for location=%s'%loc)
-        self.outputparams['v_rec'] = record_vrefs
+        """        
+        
+        
+        
             
 #         
 #         
@@ -479,27 +559,26 @@ class NeuronExperiment:
 #         
 #         
         
-        """
         
-        # for each opsin, include vector for corresponding photocurrent
-        opsindict = self.params['opdict']
-        h('access L5PC.soma')
-        for (opsin,opsinval) in opsindict.iteritems():
-            print 'testing for %s'%opsin, opsinval
-            if self.is_opsin_present(opsinval,opsin):
-                h('objref i_%s'%opsin)
-                h('i_%s = new Vector()'%opsin)
-                h('cvode.record(&%s[0].i%s,i_%s,tvec)'%(opsin,opsin,opsin)) 
-                print 'Recording from i_%s'%opsin
-                
-        """ # TODO remove once debugged
     
     def simulate_exp(self):
+        print 'Got here'
+        print "Init experiment ..."
+        #self.cell.initialise()
+        """
+        init()
+        run(self.params['tstop'])
         
-        print "Init experiment ...",
+        """
         h.init()
-        print "Init successful. About to run experiment ...",
         h.run()
+        
+        
+        print "Init successful. About to run experiment ..."
+        try:
+            pass
+        except:
+            print 'eerrrer'
         print "...finished"
         
     def is_opsin_present(self,opsinvalue, opsin):
@@ -516,6 +595,9 @@ class NeuronExperiment:
         return len(params['record_loc'][typerec])
         
     def save_data(self):#,expname,savedata=False,opsindict={}):
+        """
+        
+        """
         expname = self.params['expname']
         if not self.params['savedata']:
             return
@@ -528,12 +610,24 @@ class NeuronExperiment:
         mat[0,:] = self.rec_t
         for i in range(self.num_recording_areas(self.params, 'v')):
             mat[i+1,:] = self.outputparams['v_rec']['v_%s'%self.params['record_loc']['v'][i]]
-
         np.savetxt(expname+"_v.dat",mat)
         # TODO also save tag names as header info
         
-        if len(self.params['opdict'].keys())==0:
-            return
+        
+        print self.outputparams.keys()
+        try:
+            print self.outputparams['iphoto_rec']
+        
+            # hack to make sure that we're recording iPhoto ok
+            mat = np.zeros((2,int(len(self.rec_t))))
+            mat[0,:] = self.rec_t
+            mat[1,:] = self.outputparams['iphoto_rec']['iphoto_mysoma']
+            np.savetxt('test_iphoto.txt',mat)
+        except:
+            pass
+        
+        #if len(self.params['opdict'].keys())==0:
+        #######    return
         """
         for opsin in self.params['opdict'].keys():
             if not self.is_opsin_present(self.params['opdict'][opsin],opsin):
@@ -595,10 +689,10 @@ class NeuronExperiment:
     def plot_optogenetics(self):
         
         if self.params.has_key('opsindict'):
-            print self.params['opsindict']
+            #print self.params['opsindict']
             for (opsin,oplocations) in self.params['opsindict'].iteritems():
                 for (oploc,opexp) in oplocations.iteritems():
-                    print opexp
+                    #print opexp
                     if oploc.lower() == 'none':
                         continue
                     for pulsenum in range(opexp['n_pulses']):                
@@ -629,6 +723,10 @@ class NeuronExperiment:
     def run_plots(self):
         lw = 2
         
+        if len(self.params['plot'].keys())==0:
+            print 'No plots to create'
+            return
+        
         for figid in self.params['plot'].keys():
             pylab.figure()
             
@@ -651,7 +749,7 @@ class NeuronExperiment:
             self.plot_optogenetics()
             
             if self.params['expname'] is not None:
-                savename = '%s_%s.png'%(self.params['expname'],figid)
+                savename = '%s_%s_%s.png'%(self.params['expname'],self.params['description'],figid)
                 pylab.savefig(savename)
                 print "Saved figure under %s*.png"%savename
                 pylab.close('all')
@@ -740,24 +838,46 @@ class NeuronExperiment:
         else:
             pylab.show()
             
+    def save_outputfile(self):
+        self.outputparams['time_saved'] = time.strftime('%y/%m/%d:%H.%M')
+        for (k,v) in self.outputparams.iteritems():
+            print k, '-->',v
+        fio.saveresults(self.outputparams, self.params['expname'])
+        
 
     def print_stats(self):
-        print self.outputparams['v_rec']
+        # TODO: implement
+        pass
+        #print self.outputparams['v_rec']
+    
+    def printstatus(self,msg):
+        print '='*30
+        print msg
+        print '='*30
+        
     
     def main(self,exp_keydict):
         print '\n'*2, '='*40, exp_keydict['expname']
         
         self.params.update(exp_keydict)
+        self.printstatus('Setting up')
         self.setup()
         self.set_experiment_type()
+        self.printstatus('Setting stimulus')
         self.set_stimulus()
         self.new_set_stimulus()
-        self.add_optogenetics_test()
-        #self.add_optogenetics(self.params['opdict'])
+        self.printstatus('Setting optogenetics')
+        self.add_optogenetics()
+        #self.add_optogenetics_old(self.params['opdict'])
+        self.printstatus('Setting recording')
         self.setup_record()
+        self.printstatus('Simulating')
         self.simulate_exp()
+        self.printstatus('Saving data')
         self.save_data()
+        self.printstatus('Running plots')
         self.run_plots()
+        #self.save_outputfile()
         self.print_stats()
     
     

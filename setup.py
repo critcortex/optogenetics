@@ -8,7 +8,7 @@ Runs nrnivmodl to generate objects from mod files
 """
 
 # create folders
-folders = ['experiments/']
+folders = ['experiments/','diary/']
 for f in folders:
     try:
         call(['mkdir',f])

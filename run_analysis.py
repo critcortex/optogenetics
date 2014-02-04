@@ -8,19 +8,26 @@ import glob
 import time
 import pickle as pkl
 import itertools
-#import NeuroTools.signals  
+import NeuroTools.signals  
 
 DEFAULT_FREQ = [0.5,1,1.5,2,2.5,4,5,6,7,8,9,10,15,20,30,35,40,45,50]
 DEFAULT_IRRAD = [1,2,5,10,20,50,100]
 DEFAULT_PARAMS = {'FREQ':DEFAULT_FREQ,'IRRAD':DEFAULT_IRRAD}
 DEFAULT_ANALYSIS_SETTINGS = {'v_th': -20., 'tstart':200,'tstop':2000,'prebuffer':300,'postbuffer':150}
 
-FUNCTION_LOOKUP = {'FI'     :'calc_firingrate',
+FUNCTION_LOOKUP = {'isi':'calc_feature',
+                   'cv_isi':'calc_feature',
+                   'cv_kl':'calc_feature',
+                   'fano_factor_isi':'calc_feature',
+                   'mean_rate':'calc_feature',
+                   'spiketimes':'process_spiketimes',
+                   'FI'     :'calc_firingrate',
                    'iPhoto' : 'calc_peak_iPhoto'}
 
 EXP_DAT_LOCATION = 'experiments/%s/dat/'
 EXP_IMG_LOCATION = 'experiments/%s/img/'
 EXP_PKL_LOCATION = 'experiments/%s/pkl/'
+EXP_GDF_LOCATION = 'experiments/%s/gdf/'
 
 OPSINS_IPHOTO = {'ChR': False, 
              'NpHR': True,
@@ -54,6 +61,7 @@ class AnalyticFrame:
         self.expplotter = ExperimentPlotter()
         self.analysis_params = DEFAULT_ANALYSIS_SETTINGS
         
+        
     #def add_experimentset(self,expset):
     #    self.experimentset.append(expset)
     
@@ -73,6 +81,7 @@ class AnalyticFrame:
             
         print len(expbases),expbases
         print len(expsubselects), expsubselects
+        
         
         for (i,expss) in enumerate(expsubselects):
             ee = ExperimentSet(expbases[i],expss,explabels[i])
@@ -132,6 +141,12 @@ class AnalyticFrame:
         except:
             print 'Error with updating analysis params.'
             return 
+
+    def submenu_extractSpikes(self):
+        print 'Default frequencies are: ', DEFAULT_FREQ
+        #TODO: user input for frequencies
+        for exp in self.experimentset:
+            exp.calculate_responses('spiketimes')    
     
     def submenu_runFI(self):
         print 'Default frequencies are: ', DEFAULT_FREQ
@@ -149,6 +164,12 @@ class AnalyticFrame:
         print 'Types of analysis to be performed:',analysis_fns 
         for exps in self.experimentset:
             exps.run_analysis(analysis_fns)        
+            
+    def perform_analysis(self,analysis_features=[]):
+        #for feature in analysis_features:
+        #    print feature,'='*60
+        for exps in self.experimentset:
+            exps.run_analysis(analysis_features)
         
     def submenu_save(self):
         print 'Save values'
@@ -160,29 +181,28 @@ class AnalyticFrame:
         for exp in self.experimentset:
             exp.load_experiments()       
 
-    def submenu_plot(self,exptype=None,supplied_figname=None):
+    def submenu_plot(self,exptype=None,supplied_figname=None,**kwargs):
         print "Current plots available: ----------------------------------"
     
-        kk = ['FI','IClamp','IClamp_iPhoto','IClamp_iPhoto_peak','FI_compare','fit_FI'] 
+        kk = ['FI','IClamp','IClamp_iPhoto','IClamp_iPhoto_peak','FI_compare','fit_FI','PSTH_population','population_raster','population_voltage','compare_features'] 
         #TODO: get superset of keys for all exp.results
         for (i,k) in enumerate(kk):
             print '%g - %s'%(i,k)
         
-        #try:
-        if True:
-            if supplied_figname is None and exptype is None:
-                exptype = int(raw_input('Select type : '))
-                
-                figname = raw_input('Enter default fig name: ')
-                if figname=='': figname = '%s'%time.strftime('%H%M%S')
-            else:
-                figname = supplied_figname
-
-            print figname, exptype, kk[exptype]
-            getattr(self.expplotter,'plot_%s'%kk[exptype])(self.experimentset,savefig=figname)
+        if supplied_figname is None and exptype is None:
+            exptype = int(raw_input('Select type : '))
             
-        #except:
-            print 'Errored'
+            figname = raw_input('Enter default fig name: ')
+            if figname=='': figname = '%s'%time.strftime('%H%M%S')
+        else:
+            figname = supplied_figname
+
+        #print 'params = ',params
+        print 'kwargs = ',kwargs
+        print figname, exptype, kk[exptype]
+        getattr(self.expplotter,'plot_%s'%kk[exptype])(self.experimentset,savefig=figname,**kwargs)
+        
+    
         
     def submenu_print(self):
         
@@ -249,6 +269,11 @@ class AnalyticFrame:
         """
 class ExperimentPlotter:
     
+    def print_header(self,plottype,expset):
+        print '='*40
+        print 'Creating %s plot for expset = %s'%(plottype,str(expset))
+        print '='*40
+        
     
     def __get_color(self,cmap,value=0.8):
         cNorm = colors.Normalize(vmin=0,vmax=1) 
@@ -388,7 +413,6 @@ class ExperimentPlotter:
         
         
         
-
     def plot_FI_compare(self,experimentsets,savefig=None,settings='paper'):
         rcsettings = RC_SETTINGS[settings]
         pylab.rcParams.update(rcsettings)
@@ -404,7 +428,8 @@ class ExperimentPlotter:
             print len(expset.expvariables[0]), len(expset.expvariables[1])
             print len(expset.expvariables[0]) * len(expset.expvariables[1])
             data = data.reshape(len(expset.expvariables[0]),len(expset.expvariables[1]))
-            pylab.pcolor(data,vmax=30.,cmap=cm.YlGnBu) #,c=rcsettings['cmaps'][0])
+             
+            pylab.pcolor(data,vmax=30.,cmap=cm.YlGnBu) #@UndefinedVariable
             # turn the right and top axes off
             ax = pylab.gca()
             self.__turn_off_border(ax)
@@ -617,7 +642,211 @@ class ExperimentPlotter:
         self.__turn_off_border(axes,turnoffs=['right','top','bottom'])
         axes.set_xticks([])
 
+    def plot_PSTH_population(self,experimentsets,savefig=None,settings='paper',binwidth=50.,tstop=1250):
+        rcsettings = RC_SETTINGS[settings]
+        print 'In plot_PSTH_population'
+        bins =  np.arange(0,tstop,binwidth)
+        if bins[-1] < tstop:
+            bins = np.append(bins,tstop)
+        
+        print "There are %g experiment sets ... "%len(experimentsets)
+        
+        for (i,expset) in enumerate(experimentsets):
+            self.print_header('PSTH', expset)
+            ies = expset.expvariables
+            spikes = []
+            count = 0
+            print "<---------------------------===============> There are %g experiments in this set, #%g ... "%(len(expset.experiments),i)
+            for exp in expset.experiments:
+                
+                sp = exp.get_spikes()
+                print sp ,'-'*40
+                if sp is None or sp.size==0:
+                    continue
+                spikes += list(sp.flatten())
+                count += 1
+                
+                
+            if count==0:
+                print "Count =0"
+                continue
+            if len(spikes)==0:
+                print "sp = None =0"
+                continue
+            print spikes
+            print count
+            
+            fig = pylab.figure() 
+            ax = fig.gca()
+            ax.hist(spikes,bins=bins)
+            pylab.title('PSTH for %s (n=%g)'%('experiment',count))
+            self.__turn_off_border(ax)
+            
+            if savefig is not None:
+                figname = '%s_%s_PSTH_%s.png'%(savefig,str(expset),time.strftime('%y%m%d'))
+                fig.savefig(figname)
+                print 'Saved figure as %s'%figname
+            
+            
+    def plot_population_raster(self,experimentsets,savefig=None,settings='paper',marker='|',align=None,offset=100,tmax=1500):
+        """
+        
+        Params:
+            experimentsets
+            savefig            if not None, then the name of the file
+            settings           rcsettings for paper or poster
+            marker             marker to be used to denote a spike
+            align              list of values by which each experiment should be aligned i.e. when an event happened for each trial 
+            offset             value to which the events should be aligned. Only included if align is not None
+        """
+        rcsettings = RC_SETTINGS[settings]
+        print 'In plot_population_raster'
+           
+        
+        for (i,expset) in enumerate(experimentsets):
+            self.print_header('population_raster', expset)
+            spikes = []
+            labels = []
+            ys = []
+            count = 0
+            for exp in expset.experiments:
+               
+                sp = exp.get_spikes()
+                print sp ,'-'*40
+                if sp is None or sp.size==0:
+                    continue
+                spikes.append(sp.flatten())
+                labels.append(exp.get_label())
+                ys.append(np.ones(sp.size)*count)
+                count += 1
 
+            if count==0:
+                continue
+            if len(spikes)==0:
+                continue
+
+            fig = pylab.figure()
+            ax = fig.gca()
+            for c in range(count):
+                if align is None:
+                    ax.scatter(spikes[c],ys[c],marker=marker)
+                else:
+                    ax.scatter(spikes[c]-align[c]+offset,ys[c],marker=marker)
+            
+            self.__turn_off_border(ax)
+            ax.set_xlabel('time (ms)')
+            ax.set_yticks(range(count))
+            ax.set_yticklabels(labels)
+            pylab.xlim((0,tmax))
+            #ax.set_ylabel('I_%s (nA)'%opsintype)
+            if savefig is not None:
+                figname = '%s_%s_raster_%s.png'%(savefig,str(expset),time.strftime('%y%m%d'))
+                fig.savefig(figname)
+                print 'Saved figure as %s'%figname
+            
+            
+    def plot_population_voltage(self,experimentsets,savefig=None,settings='paper',align=None,offset=100,tmax=1500,plotMean=False,colors=[],cmap=None,colorMean='k',showLegend=True,useCBar=False):
+        """
+        
+        Params:
+            experimentsets
+            savefig            if not None, then the name of the file
+            settings           rcsettings for paper or poster
+            align              list of values by which each experiment should be aligned i.e. when an event happened for each trial 
+            offset             value to which the events should be aligned. Only included if align is not None
+        """
+        rcsettings = RC_SETTINGS[settings]
+        for (i,expset) in enumerate(experimentsets):
+            
+            self.print_header('population_voltage', expset)
+            
+            fig = pylab.figure()
+            ax = fig.gca()
+            
+            for (c,exp) in enumerate(expset.experiments):
+                data = exp.get_voltage_trace()
+                ts,vs = data[0],data[1]
+                
+                if align is None:
+                    ax.plot(ts,vs,label=exp.get_label())
+                else:        
+                    ax.plot(ts-align[c]+offset,vs,label=exp.get_label())
+                    
+                if plotMean:
+                    #TODO implement plotMean
+                    pass
+                
+            self.__turn_off_border(ax)
+            ax.set_xlabel('time (ms)')
+            ax.set_ylabel('mV')
+            pylab.xlim((0,tmax))
+            if savefig is not None:
+                figname = '%s_%s_voltage_%s.png'%(savefig,str(expset),time.strftime('%y%m%d'))
+                fig.savefig(figname)
+                print 'Saved figure as %s'%figname
+            
+    def plot_compare_features(self,experimentsets,savefig=None,settings='paper',traits=[],drawMean=True,marker='o'):
+        
+        rcsettings = RC_SETTINGS[settings]
+        allresults = {}
+        labels = []
+        #setup
+        for t in traits:
+            allresults[t] = {}
+        
+        #get results --> our data structure
+        for (i,expset) in enumerate(experimentsets):
+            print '='*40
+            print expset
+            print expset.get_label()
+            print '='*40
+            labels.append(expset.get_label())
+            #setup
+            for t in traits:
+                allresults[t][expset.get_label()] = []
+            
+            for (j,exp) in enumerate(expset.experiments):
+                results = exp.get_results()
+                print results
+                if len(results.items())==0:
+                    continue
+                
+                for t in traits:
+                    if not results.has_key(t):
+                        continue
+                    allresults[t][expset.get_label()].append(results[t])
+         
+        
+        #plot results
+        for t in traits:
+            pylab.clf()
+            fig = pylab.figure()
+            ax = fig.gca()
+            
+            results = allresults[t]
+            expsets = results.keys()
+            expsets.sort()
+            means = []
+            stds =  []
+            
+            for expset in expsets:    
+                rr = np.array( results[expset])
+                means.append(rr.mean())
+                stds.append(rr.std())
+            
+            if drawMean:
+                fmt = '-'
+            ax.errorbar(range(len(expsets)),means,yerr=stds,fmt=fmt+marker)
+            
+            self.__turn_off_border(ax)
+            ax.set_xticks(range(len(expsets)))
+            ax.set_xticklabels(labels)
+            pylab.xlim((-1,len(labels)+1))
+            
+            if savefig is not None:
+                figname = '%s_%s_trait%s_%s.png'%(savefig,str(expset),t,time.strftime('%y%m%d'))
+                fig.savefig(figname)
+                print 'Saved figure as %s'%figname
 
 class ExperimentSet:
 
@@ -645,6 +874,9 @@ class ExperimentSet:
         return self.label
     
     def populate_experiments(self,exp_params,analysis_params):
+        print '='*40
+        print exp_params
+        print analysis_params
 
         if type(exp_params) is not list:
             print 'Error'
@@ -660,7 +892,7 @@ class ExperimentSet:
         for v in list(itertools.product(*self.expvariables)):
             #print v
             #print self.basename , self.subselect%v
-            self.experiments.append(Experiment(self.basename ,self.subselect%v,analysis_params))
+            self.experiments.append(Experiment(self.basename ,self.subselect%v,analysis_params,vals=v))
     
     def save_experiments(self):
         print 'Saving ExperimentSet', self.label
@@ -687,10 +919,11 @@ class ExperimentSet:
     #    pass
         
     def run_analysis(self,analysis_fns,recalc=False):
-        print analysis_fns
+        print 'in expset = ', analysis_fns
         for exp in self.experiments:
             print 'About to run analysis for ',str(exp)
             exp.calculate_results(analysis_fns, recalc)
+            exp.save_results()
     
     def calculate_responses(self,key,recalc=False):
         print 'calculate responses', key
@@ -704,8 +937,9 @@ class ExperimentSet:
                     return
             tmp_results = []
             for exp in self.experiments:
+                #print 'looking up ',FUNCTION_LOOKUP[key]
                 tmp_v = getattr(exp, FUNCTION_LOOKUP[key])()
-                print tmp_v, '-------------------------------------------------------'
+                #print tmp_v, '-------------------------------------------------------'
                 tmp_results.append(tmp_v)
             self.results[key] = tmp_results
         except:
@@ -725,18 +959,50 @@ class ExperimentSet:
             print ' '*indent, '%s'%(val)
         for (k,v) in self.results.iteritems():
             print ' '*indent, '%s = %s'%(k,v)
+            
+
 
 class Experiment:
     
-    def __init__(self,basename,expname,analysis_params):
+    NEUROTOOLS_METHODS = ['isi','cv_isi','cv_kl','fano_factor_isi','mean_rate']
+    
+    def __init__(self,basename,expname,analysis_params={},vals={},tryload=True):
         self.basename = basename
         self.expname = expname
         self.fullname = ''
         self.results = {}
         self.analysis_params = analysis_params
+        if not self.analysis_params.has_key('tstart'):
+            self.analysis_params['tstart']=None
+        if not self.analysis_params.has_key('tstop'):
+            self.analysis_params['tstop']=None
+        self.spikes = None
+        self.label = None
+        self.values = vals
+        if analysis_params.has_key('label_format'):
+            self.label = analysis_params['label_format']
+        self.spiketrain = None
+        
+        if tryload:
+            try:
+                self.load_results()
+            except:
+                print 'Error with tryload in init'
+                
+            try:
+                self.load_spikes()
+            except:
+                print 'Error with second tryload'
         
     def __str__(self):
         return self.basename+self.expname
+    
+    def get_label(self):
+        print self.label
+        print self.values
+        if self.label is not None:
+            return self.label%self.values
+        return str(self)
     
     
     def save_results(self):
@@ -759,43 +1025,103 @@ class Experiment:
             self.results = pkl.load(pkl_file)
             pkl_file.close()
             print '... loaded successfully'
+        except IOError as e:
+            print 'File does not exist'
+            raise e
         except:
             print "Unexpected error:", sys.exc_info()[0]
+    
+    def save_spikes(self,spikes):
+        #TODO : should check that file doesn't already exist, and if it does ...?
         
+        try:    
+            savefile = EXP_GDF_LOCATION%self.basename +"%s.gdf"%(self.basename+self.expname)
+            print 'Attempting to save to file:',savefile,
+            np.savetxt(savefile,spikes)
+            print '...saved successfully'
+        except:
+            print "Unexpected error:", sys.exc_info()[0]
+            
+            
+    def load_spikes(self):
+        try:
+        #if True:
+            loadfile = EXP_GDF_LOCATION%self.basename +"%s.gdf"%(self.basename+self.expname)
+            print 'Attempting to load spike file:',loadfile,
+            spikes = np.loadtxt(loadfile,ndmin=1)
+            print '... loaded successfully',
+            self.spikes = spikes
+            
+            print 'and set spikes as field'
+        #except TypeError,IndexError:
+        #    self.spikes = np.array([])
+        except IOError:
+            print 'File does not exist'
+        except:
+            print "\nUnexpected error:", sys.exc_info()[0]
+            return
+        self.get_spiketrain()
+    
+            
+    def _check_spikefile_exists(self):
+        savefile = EXP_GDF_LOCATION%self.basename +"%s.gdf"%(self.basename+self.expname)
+        print 'Testing for savefile', savefile
+        gg = glob.glob(savefile)
+        if len(gg)==1:
+            return True
+        else:
+            return False
         
-    def calculate_results(self,properties=[],recalc=False):
+    def calculate_results(self,properties=[],recalc=False,save=True):
         """
             Assumes that self.results is already loaded
         """
         for prop in properties:
-            print 'Looking at property'
+            print 'Looking at property', prop
+            #print FUNCTION_LOOKUP
             if not recalc and self.results.has_key(prop):
                 continue
             elif recalc:
                 print 'Calculating value for %s'%prop
             elif not self.results.has_key(prop):
                 print 'Value for %s missing; running %s'%(prop, FUNCTION_LOOKUP[prop])
-            #result = getattr(self, FUNCTION_LOOKUP[prop])()
-            #self.results[prop] = result
-            getattr(self, FUNCTION_LOOKUP[prop])()
-            
-                
-
+            result = getattr(self, FUNCTION_LOOKUP[prop])(feature=prop)
+            if result is not None:
+                self.results[prop] = result
+            #getattr(self, FUNCTION_LOOKUP[prop])()
+        print self.results
+        if save and self.results != {}:
+            self.save_results()
     
     def get_dat_file(self,modifier=''):
         try:
             datfile = EXP_DAT_LOCATION%self.basename +"%s%s.dat"%(self.basename+self.expname,modifier)
             print 'location =',datfile
         except:
-            print 'Error with finding file'
+            print 'Error with resolving name when finding file'
             return 
         gg = glob.glob(datfile)
         if len(gg)==1:
+            print 'Found it'                    
             self.fullname = gg[0][:-4] # name of .dat file without the file extension
             return gg[0]
         elif len(gg)==0:
             #TODO: raise error
-            print 'No file found: ',file
+            print 'No file found: ',datfile
+            try:
+                datfile = EXP_DAT_LOCATION%self.basename +"%s%s_v.dat"%(self.basename+self.expname,modifier)
+                print 'trying location =',datfile
+                dd = glob.glob(datfile)
+                print dd
+                if len(dd)==1:
+                    print 'Found it'
+                    self.fullname = dd[0][:-6] # name of .dat file without the file extension
+                    return dd[0]
+                else:
+                    print 'Could not find it = '
+            except:
+                print 'Error = ',sys.exc_info()[0] 
+                pass
         elif len(gg)>1:
             #TODO: raise error - too many files
             print 'Too many files found: ',file
@@ -803,9 +1129,10 @@ class Experiment:
     def get_voltage_trace(self):
         data = np.loadtxt(self.get_dat_file()) 
         t,v_soma = data[0,:],data[1,:]
+        print data.size
         return (t,v_soma)
 
-    def calc_peak_iPhoto(self):
+    def calc_peak_iPhoto(self,**kwargs):
         #if self.results['iPhoto'] is None:
         #    self.results['iPhoto'] = {}
         #self.results['iPhoto'][opsintype] = peak_iphoto
@@ -817,7 +1144,7 @@ class Experiment:
                 pass
 
 
-    def calc_peak_iPhoto_opsin(self,opsintype,max_iphoto):
+    def calc_peak_iPhoto_opsin(self,opsintype,max_iphoto,**kwargs):
         """
             opsin_type
             max_iphoto
@@ -856,9 +1183,14 @@ class Experiment:
         """
         #load dat curve, get v_soma
         try:
-            data = np.loadtxt(self.get_dat_file()) 
-            t,v_soma = data[0,:],data[1,:]
-            spikes = self.__extract_spiketimes(t,v_soma)
+            if self.spikes is not None:
+                spikes = self.spikes
+            elif self._check_spikefile_exists():
+                spikes = self.load_spikes()
+            else:
+                data = np.loadtxt(self.get_dat_file()) 
+                t,v_soma = data[0,:],data[1,:]
+                spikes = self.extract_spiketimes(t,v_soma)
             if len(spikes)==0:
                 print 'No spikes observed during entire duration'
                 self.results['FI'] = 0
@@ -874,14 +1206,91 @@ class Experiment:
             return -1
         
         
+    def check_spikes(self):
+        self.get_spikes()
+        self.get_spiketrain()
+
+    def calc_feature(self,feature,**kwargs):
+        
+        self.check_spikes()
+        if self.spikes.size == 0:
+            print 'Emptry spike train'
+            return
+        
+        if self.NEUROTOOLS_METHODS.count(feature)>0:
+            try:
+                value = getattr(self.spiketrain,feature)()
+            except:
+                print "Unexpected error:", sys.exc_info()[0]
+                return None
+            
+            print '%s = '%feature,value
+            return value
+        else:
+            print "Characteristic '%' is currently unsupported"%feature
+            return None
+
+
+    def get_spiketrain(self):
+        if self.spiketrain is not None:
+            pass
+        elif self.spiketrain is None and self.spikes is not None:
+            self.spiketrain = NeuroTools.signals.SpikeTrain(self.spikes,self.analysis_params['tstart'],self.analysis_params['tstop'])
+        elif self.spikes is None:
+            print 'Could not create spiketrain'
+        return self.spiketrain
         
     
-    def __extract_spiketimes(self,times,v_soma):
+        
+    def get_spikes(self):
+        if self.spikes is not None:
+            pass
+        elif self._check_spikefile_exists():
+            self.load_spikes()
+        else:
+            spikes = self.process_spiketimes()
+            self.save_spikes(spikes)
+            self.spikes = spikes
+        
+        return self.spikes
+    
+    def get_results(self):
+        if len(self.results.items())==0:
+            pass
+        else:
+            try:
+                self.load_results()
+            except:
+                print "Couldn't load results"
+                print sys.exc_info()
+        print 'self.results = ',self.results
+        return self.results
+        
+        
+    def process_spiketimes(self,**params):
+        
+        
+        try:
+            print 'Am going to check if spike file exists ...'
+            if self._check_spikefile_exists():
+                print 'File already exists'
+                return
+            data = np.loadtxt(self.get_dat_file()) 
+            t,v_soma = data[0,:],data[1,:]
+            spikes = self.extract_spiketimes(t,v_soma)
+            # we want to have all spikes, not just the ones in our area of analysis
+            self.save_spikes(spikes)
+            return spikes
+        except:
+            pass #print "Unexpected error:", sys.exc_info()[0]
+    
+    def extract_spiketimes(self,times,v_soma):
         """
         This section is a rewritten version of NeuroTools
         
         """
         above = np.where(v_soma > self.analysis_params['v_th'])[0]
+        print 'spikes = ',above
         if len(above) <= 0:
             return []
         else:
