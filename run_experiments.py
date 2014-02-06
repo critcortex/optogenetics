@@ -283,7 +283,7 @@ class ExpSetup():
                 # if it already exists, we don't need to run
                 #print '---------------------------- would not run'
                 return 
-        print 'would run ', expbase+params['description']
+        #print 'would run ', expbase+params['description']
         self.main(expbase,params,runon=runon)                    
     
     def run_frequency_range(self,expbase,freqs=[0.5,1,2.5,5,10],pulsewidth=10.,transient=200.,n_pulses=10,runon='local',params={},offset_phase=0.5):
@@ -390,7 +390,19 @@ class ExpSetup():
             if runjob:
                 self.submit_to_cluster(exp['expname'])
        
-
+    def main_run_missing(self,expname,newparams,extraparam=''):
+        # check whether job exists in main location
+        if fio.check_mainexp_location(expname+newparams['description']+extraparam+'*.dat'):
+            print 'File exists A'
+            return
+        # check whether it exists in exp home
+        if fio.check_expfolder(expname, newparams['description']+extraparam, 'dat'):
+            print 'File exists B'
+            return
+        # if still clear it doesn't exist, then run it
+        print 'I want to run for file = ', expname, newparams['description']
+        self.main_run_cluster(expname,newparams)
+    
     def main(self,expname,newparams,runon='local'):
         """
         
@@ -399,6 +411,8 @@ class ExpSetup():
             self.main_run_local(expname,newparams)
         elif runon=='cluster' or runon=='saveonly':
             self.main_run_cluster(expname,newparams,runjob=(runon=='cluster'))
+        elif runon=='missing':
+            self.main_run_missing(expname,newparams)
         else:
             raise Exception('Unknown option for runon: %s'%runon)
 
