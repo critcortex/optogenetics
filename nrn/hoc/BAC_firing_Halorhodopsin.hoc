@@ -1,0 +1,258 @@
+//Author: Etay Hay, 2011
+//  Models of Neocortical Layer 5b Pyramidal Cells Capturing a Wide Range of
+//  Dendritic and Perisomatic Active Properties
+//  (Hay et al., PLoS Computational Biology, 2011) 
+//
+// A simulation of L5 Pyramidal Cell BAC firing.
+
+
+//====================== General files and tools =====================
+load_file("nrngui.hoc")
+
+//====================== cvode =======================================
+objref cvode
+
+cvode = new CVode()
+cvode.active(1)
+
+//=================== creating cell object ===========================
+load_file("import3d.hoc")
+objref L5PC
+
+strdef morphology_file
+morphology_file = "morphologies/cell1.asc"
+
+load_file("models/L5PCbiophys3.hoc")
+load_file("models/L5PCtemplate.hoc")
+L5PC = new L5PCtemplate(morphology_file)
+
+//=================== settings ================================
+
+strdef experiment_type
+
+experiment_type = "NpHR" //"ArchT" // "ChR" // "NpHR" // 'BAP', 'CaBurst', 'NpHR', or 'BAC'
+
+v_init = -80   // orig val: -80
+BACdt = 5
+
+//somatic pulse settings
+squareAmp = 1.0  // original value: 1.9
+
+//EPSP settings
+risetau = 0.5
+decaytau = 5
+Imax = 0.5
+
+proximalpoint = 400
+distalpoint = 620
+
+tstart = 300       //KN
+tstop = tstart+1000
+
+if (0==strcmp(experiment_type,"BAP")) {
+    somastimamp = squareAmp
+    EPSPamp = 0
+}
+if (0==strcmp(experiment_type,"CaBurst")) {
+    somastimamp = 0
+    EPSPamp = Imax*3
+}
+if (0==strcmp(experiment_type,"BAC")) {
+    somastimamp = squareAmp
+    EPSPamp = Imax
+}
+
+// ====== halorhodopsin expressed only in dendrites ======================
+
+
+if (0==strcmp(experiment_type,"ArchT")) {
+
+    load_file("ArchT-in-apical.hoc")  
+    load_file("ArchT-in-basal.hoc")  
+    load_file("ArchT-in-soma.hoc")  
+    load_file("ArchT-in-axon.hoc")  
+    print "loaded ArchT apical successful"
+    ArchT_in_apical(5e-4,10,600,200,350,600)
+    ArchT_in_basal(5e-4,10,600,200,350,600)
+    ArchT_in_soma(5e-4,10,600,200,350,600)
+    ArchT_in_axon(5e-4,10,600,200,350,600)
+
+    somastimamp = squareAmp
+}
+
+
+
+if (0==strcmp(experiment_type,"NpHR")) {
+
+    load_file("NpHR-in-apical.hoc")
+    load_file("NpHR-in-basal.hoc")  
+    load_file("NpHR-in-soma.hoc")  
+    load_file("NpHR-in-axon.hoc")  
+    print "loaded NpHR successful"
+    NpHR_in_apical(5e-4,10,600,200,350,600,2)
+    NpHR_in_basal(5e-4,10,600,200,350,600,2)
+    NpHR_in_soma(5e-4,10,600,200,350,600,2)
+    NpHR_in_axon(5e-4,10,600,200,350,600,2)
+    
+
+    somastimamp = squareAmp
+}
+
+
+if (0==strcmp(experiment_type,"ChR")) {
+
+    load_file("ChR-in-basal.hoc")  
+    print "loaded ChR basal successful"
+    ChR_in_basal(5e-4,10,600,200,350,600)
+
+    somastimamp = 0 // squareAmp
+}
+
+//
+//if (0==strcmp(experiment_type,"EPSP")) {
+//  somastimamp = 0
+//  EPSPamp = Imax
+//}
+
+//======================== stimulus settings ============================
+
+//Somatic pulse
+objref st1
+st1 = new IClamp(0.5)
+st1.amp = somastimamp
+st1.del = tstart
+st1.dur = tstop-tstart-100
+
+////////////////////////////L5PC.soma st1
+
+//Dendritic EPSP-like current
+objref sl,st2,ns,syn1,con1,isyn, tvec
+
+isyn = new Vector()
+tvec = new Vector()
+sl = new List()
+double siteVec[2]
+
+sl = L5PC.locateSites("apic",distalpoint)
+print "sl count = "
+print sl.count()
+maxdiam = 0
+for(i=0;i<sl.count();i+=1){
+    print "i = ", i
+    dd1 = sl.o[i].x[1]
+    print "dd1 = ", dd1
+    dd = L5PC.apic[sl.o[i].x[0]].diam(dd1)
+    print "dd = ",dd
+    if (dd > maxdiam) {
+        j = i
+        maxdiam = dd 
+    }
+}
+
+print "j = "
+print j 
+
+siteVec[0] = sl.o[j].x[0]
+siteVec[1] = sl.o[j].x[1]
+
+print "distal sitevec"
+print siteVec[0],siteVec[1]
+
+access L5PC.apic[siteVec[0]]
+
+st2 = new IClamp(siteVec[1])
+st2.amp = 0
+
+L5PC.apic[siteVec[0]] {
+    st2
+        
+    syn1 = new epsp(siteVec[1])
+    syn1.tau0 = risetau       
+    syn1.tau1 = decaytau   
+    syn1.onset = tstart + BACdt  
+    syn1.imax = EPSPamp
+
+    cvode.record(&syn1.i,isyn,tvec)
+}
+
+//======================== recording settings ============================
+objref vsoma, vdend, recSite, vdend2, isoma
+
+vsoma = new Vector()
+access L5PC.soma
+cvode.record(&v(0.5),vsoma,tvec)
+
+vdend = new Vector()
+access L5PC.apic[siteVec[0]]
+cvode.record(&v(siteVec[1]),vdend,tvec)
+
+sl = new List()
+sl = L5PC.locateSites("apic",proximalpoint)
+print "sl count = "
+print sl.count()
+maxdiam = 0
+for(i=0;i<sl.count();i+=1){
+    dd1 = sl.o[i].x[1]
+    dd = L5PC.apic[sl.o[i].x[0]].diam(dd1)
+    if (dd > maxdiam) {
+        j = i
+        maxdiam = dd 
+    }
+}
+
+siteVec[0] = sl.o[j].x[0]
+siteVec[1] = sl.o[j].x[1]
+
+print "proximal sitevec"
+print siteVec[0],siteVec[1]
+
+access L5PC.apic[siteVec[0]]
+
+recSite = new IClamp(siteVec[1])
+recSite.amp = 0
+
+L5PC.apic[siteVec[0]] {
+    recSite
+}
+
+access L5PC.apic[siteVec[0]]
+vdend2 = new Vector()
+cvode.record(&v(siteVec[1]),vdend2,tvec)
+
+access L5PC.soma
+isoma = new Vector()
+cvode.record(&st1.i,isoma,tvec)
+
+//======================= plot settings ============================
+
+objref gV, gI, s
+
+gV = new Graph()
+gV.size(tstart-20,tstop,-80,40)
+gV.label(0.5,0.95,"V")
+
+gI = new Graph()
+gI.size(tstart-20,tstop,-3,6)
+gI.label(0.5,0.95,"I")
+
+s = new Shape(L5PC.all)
+s.color_list(L5PC.axonal,2,2)
+s.color_list(L5PC.somatic,5)
+s.color_list(L5PC.basal,4)
+s.color_list(L5PC.apical,1)
+s.point_mark(st2,2)
+s.point_mark(recSite,3)
+s.show(0)
+
+//============================= simulation ================================
+
+init()
+run()
+
+vsoma.plot(gV,tvec)
+vdend.plot(gV,tvec,2,1)
+vdend2.plot(gV,tvec,3,1)
+
+isyn.plot(gI,tvec,2,2)
+isoma.plot(gI,tvec,1,2)
+
