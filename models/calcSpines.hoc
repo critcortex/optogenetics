@@ -1,0 +1,82 @@
+// ----------------------------------------------------------------------------
+// calcSpines.hoc
+// Calculate the spine factor from raw spine counts.
+// 
+// The spine factor is calculated as follows:
+// 
+// SF=(A_shaft+A_spines)/A_shaft,
+//
+// where A_shaft is the surface area of the shaft and
+// A_spines is the surface area of the spines
+// 
+// 2007-06-15, Christoph Schmidt-Hieber, University of Freiburg
+//
+// accompanies the publication:
+// Schmidt-Hieber C, Jonas P, Bischofberger J (2007)
+// Subthreshold Dendritic Signal Processing and Coincidence Detection 
+// in Dentate Gyrus Granule Cells. J Neurosci 27:8430-8441
+//
+// send bug reports and suggestions to christoph.schmidt-hieber@uni-freiburg.de
+// ----------------------------------------------------------------------------
+
+pi=3.1415926535897932384626433832795
+spineArea=1.2
+
+proc calc_spines() {local aveDiam,radius,spineLength,alpha,corrF,n_points,R,r,side,A_shaft,A_spines,n_n,neuronArea,count,n_spines
+	n_spines = 0
+	if (count_spines != 0) {
+		aveDiam = 0.0
+		count = 0
+		for (n_n) {
+			aveDiam += diam(n_n)
+			count += 1
+		}
+		aveDiam /= count
+		radius = aveDiam/2.0
+		spineLength = 1.25
+		alpha = my_asin_asin(radius/(radius+spineLength))
+		corrF = pi/(pi-2.0*alpha)
+		if (debug_mode) printf("\nCorrection factor for hidden spines in section %s: %f\n",secname(),corrF)
+		count_spines *= corrF
+		if (debug_mode) n_spines += count_spines
+	}
+	if (debug_mode) printf("Spine density in section %s=%f/um\n",secname(),count_spines/L)
+	// get the total area of the spines:
+	A_spines=count_spines*spineArea
+		
+	// get the area of the shaft:
+	A_shaft=0.0
+	for (n_points=0;n_points<n3d()-1;n_points+=1) {
+	// get the surface area of a truncated cone
+	// between neighbouring points:
+		height=arc3d(n_points+1)-arc3d(n_points)
+		R=diam3d(n_points+1)/2.0
+		r=diam3d(n_points)/2.0
+		side = sqrt((R-r)*(R-r)+height*height)
+		A_shaft+=pi*side*(R+r)
+	}
+	scale_spines=(A_shaft+A_spines)/A_shaft
+	// tell the user what we did:
+	if (debug_mode) {
+		neuronArea=0.0
+		for (n_n) {
+			neuronArea+=area(n_n)
+		}
+		printf("I think the surface area of %s's shaft is %f um^2\n",secname(),A_shaft)
+		printf("NEURON thinks it's %f um^2\n",neuronArea)
+		printf("spineFactor (%s)=%f\n",secname(),scale_spines)
+		print "corrected number of spines:",n_spines
+	}
+}
+
+func numRealSpines() {local A_spines,A_shaft,x,num_spines
+	// get n_spines from scale_spines:
+	num_spines = 0.0
+	forsec "section" {
+		A_shaft = 0.0
+		for (x) A_shaft += area(x)
+		A_spines  = A_shaft * (scale_spines-1.0)
+		num_spines += (A_spines / spineArea)
+	}
+	return num_spines
+}

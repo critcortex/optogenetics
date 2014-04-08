@@ -1,0 +1,234 @@
+// ----------------------------------------------------------------------------
+// genutils.hoc
+// general routines
+//
+// 2007-03-01, Christoph Schmidt-Hieber, University of Freiburg
+//
+// accompanies the publication:
+// Schmidt-Hieber C, Jonas P, Bischofberger J (2007)
+// Subthreshold Dendritic Signal Processing and Coincidence Detection 
+// in Dentate Gyrus Granule Cells. J Neurosci 27:8430-8441
+//
+// send bug reports and suggestions to christoph.schmidt-hieber@uni-freiburg.de
+// ----------------------------------------------------------------------------
+
+// constants:
+PROXDIST=150
+
+// returns the interpolated index of a vector ($o1) where
+// $2 is found for the first time
+func whereis() {local n,retIndex,fromtop,frombottom,m,c,x0,x1,y0,y1
+    retIndex=0
+    fromtop=0
+    frombottom=0
+    // coming from top or bottom?
+    if ($o1.x[0]>$2) {
+	fromtop=1
+    } else {
+	frombottom=1
+    }
+    for n=0,$o1.size()-1 {
+	if (fromtop==1) {
+	    if ($o1.x[n]<$2) {
+		retIndex=n
+		break
+	    }
+	} else {
+	    if ($o1.x[n]>$2) {
+		retIndex=n
+		break
+	    }
+	}
+    }
+    if (retIndex==0) {
+	print "Value not found in whereis()"
+	return 0
+    }
+    // linear interpolation:
+    x0=retIndex-1
+    x1=retIndex
+    y0=$o1.x(x0)
+    y1=$o1.x(x1)
+    m=(y1-y0)/(x1-x0)
+    c=y0-m*x0
+    return ($2-c)/m
+}
+
+// Returns the full width at half-maximal amplitude (FWHM) of an event in vector $o1.
+// The index of the (estimated) peak of the event should be given as $2, baseline as $3, peak as $4
+// adopted from stimfit
+func t50() {local t50LeftId,t50RightId,t50LeftReal,t50RightReal,center,base,ampl,yLong2,yLong1
+	center=$2
+	base=$3
+	ampl=$4-$3
+	// walk left from center until HMA is reached:
+	t50LeftId=center
+	while (1) {
+		t50LeftId-=1
+		if (abs($o1.x[t50LeftId]-base)<abs(0.5 * ampl) || t50LeftId <=0) break
+	}
+	// walk right:
+	t50RightId=center
+	while (1) {
+		t50RightId+=1
+		if (abs($o1.x[t50RightId]-base)<abs(0.5 * ampl) || t50RightId >= $o1.size()) break
+	}
+
+	//calculation of real values by linear interpolation: 
+	//Left side
+	yLong2=$o1.x[t50LeftId+1]
+	yLong1=$o1.x[t50LeftId]
+	t50LeftReal=0.0
+	if (yLong2-yLong1 !=0) {
+		t50LeftReal=(t50LeftId+abs((0.5*ampl-(yLong1-base))/(yLong2-yLong1)))
+	} else {
+		t50LeftReal=t50LeftId
+	}
+	//Right side
+	yLong2=$o1.x[t50RightId]
+	yLong1=$o1.x[t50RightId-1]
+	t50RightReal=0.0
+	if (yLong2-yLong1 !=0) {
+		t50RightReal=t50RightId-abs((0.5*ampl-(yLong2-base))/abs(yLong2-yLong1))
+	} else {
+		t50RightReal=t50RightId
+	}
+	return t50RightReal-t50LeftReal
+}
+
+// returns the maximal slope of rise within the vector $o1 between indices $2 and $3
+// (typically: beginning of event ($2) to index of peak ($3))
+// adopted from stimfit
+func maxRise() {local left,right,maxRise,i,diff
+	left=$2
+	right=$3
+
+	// Maximal rise
+	maxRise=abs($o1.x[right]-$o1.x[right-1])
+	i=right-1
+	while(1) {
+		diff=abs($o1.x[i]-$o1.x[i-1])
+		if (maxRise<diff) {
+			maxRise=diff
+		}
+		i-=1
+		if (i<left) break
+	}
+	return maxRise
+}
+
+// returns the interpolated index of the maximal slope of rise 
+// within the vector $o1 between indices $2 and $3
+// (typically: beginning of event ($2) to index of peak ($3))
+// adopted from stimfit
+func maxRiseT() {local left,right,maxRise,maxRiseT,i,diff
+	left=$2
+	right=$3
+
+	// Maximal rise
+	maxRise=abs($o1.x[right]-$o1.x[right-1])
+	maxRiseT=right-0.5
+	i=right-1
+	while(1) {
+		diff=abs($o1.x[i]-$o1.x[i-1])
+		if (maxRise<diff) {
+			maxRise=diff
+			maxRiseT=i-0.5
+		}
+		i-=1
+		if (i<left) break
+	}
+	return maxRiseT
+}
+
+// returns the maximal slope of decay within the vector $o1 between indices $2 and $3
+// (typically: index of peak ($2) to end of event ($3))
+// adopted from stimfit
+func maxDecay() {local left,right,maxDecay,i,diff
+	left=$2
+	right=$3
+	if (left<0) left=0
+	if (left > $o1.size()-3) left=$o1.size()-3
+	if (right<0) right=0
+	if (right > $o1.size()-1) right=$o1.size()-1
+	// Maximal decay
+	maxDecay=abs($o1.x[left+1]-$o1.x[left])
+	i=left+2
+	while(1) {
+		diff=abs($o1.x[i]-$o1.x[i-1])
+		if (maxDecay<diff) {
+			maxDecay=diff
+		}
+		i+=1
+		if (i>=right) break
+	}
+	return maxDecay
+}
+
+begintemplate Location
+public secRef, loc, distToRootCenter
+objref secRef
+
+proc init() {
+	secRef = new SectionRef()
+	loc = $1
+	secRef.root distance(0,0.5)
+	secRef.sec distToRootCenter = distance(loc)
+}
+endtemplate Location
+
+// returns a list of locations from the 1-end of the
+// currently accessed section to the center (0.5) of root
+obfunc pathToRootCenter() {local x,i localobj retList,secRef,tempLoc
+	retList = new List()
+	secRef = new SectionRef()
+	while (secRef.has_parent()) {
+		// We don't want the 0-end to be added,
+		// because it's the same as the parent's 1-end.
+		secRef.sec for (x) if (x < 1) {
+			tempLoc = new Location(1-x)
+			retList.append(tempLoc)
+		}
+		secRef.parent secRef = new SectionRef()
+	}
+
+	// add root:
+	secRef.sec for (x) if (x <= 0.5) {
+		tempLoc = new Location(1-x)
+		retList.append(tempLoc)
+	}
+
+	if (debug_mode) {
+		for i=0,retList.count()-1 {
+			retList.o(i).secRef.sec if (debug_mode) print "Added ",secname(),"(",retList.o(i).loc,")"
+		}
+	}
+	return retList
+}
+
+obfunc termList() {local i localobj retList,secRef,rootRef
+	retList=new List()
+	// check whether a section has a child...
+	forsec "section" {
+		secRef = new SectionRef()
+		$o2.sec distance(0,0.5)
+		if (secRef.nchild==0 && scale_spines != 1.0 && distance(1.0) > $1) {
+		// ... and if it doesn't, add it to the list
+			retList.append(secRef)
+			secRef.sec if (debug_mode) print secname()," is terminal"
+		}
+	}
+	return retList
+}
+
+// returns temperature-dependent scaling factor
+func tempScale() {local scale
+	// $1: Q10
+	return $1^((celsius-24)/10)
+}
+
+func secArea() {local totalArea
+	totalArea = 0
+	for (x) totalArea += area(x)
+	return totalArea
+}
