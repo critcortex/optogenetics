@@ -70,7 +70,8 @@ def analyse():
     
     af.submenu_runFI()
     af.submenu_print()
-    af.submenu_save()    
+    af.submenu_save() 
+       
     
     
     #af.submenu_plot(3, expbase+'_FI_compare')
