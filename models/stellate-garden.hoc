@@ -13,8 +13,8 @@
 
 // load gui or stdrun:
 load_file("stdrun.hoc")
-load_file("./nrn/share/genutils.hoc")
-load_file("./nrn/share/fixnseg.hoc")
+load_file("models/genutils.hoc")
+load_file("models/fixnseg.hoc")
 
 begintemplate stellate_garden
 
@@ -76,7 +76,7 @@ proc biophys() {
     print "Inserting passive membrane"
     forall {insert pas Ra=global_ra e_pas=Vleak}
     print "Inserting spines and setting spine scale values"
-    forall { insert spines scale_spines=1.0 } /* Garden et al. don't seem to be correcting for spines */
+    forall { insert spines_stellate scale_spines=1.0 } /* Garden et al. don't seem to be correcting for spines */
     print "Initializing uniform passive membrane properties"
     Rm=rmsoma
     forall { g_pas=1/(Rm/scale_spines) cm=Cm*scale_spines Ra = global_ra }
