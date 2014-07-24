@@ -1,0 +1,178 @@
+/*----------------------------------------------------- 
+   OPTOGENETIC channelrhodopsin2 (ChR2)
+   voltage-clamp code for fiting parameters  
+ ------------------------------------------------------*/
+
+//====================== General files and tools =====================
+load_file("nrngui.hoc")
+
+//====================== cvode =======================================
+objref cvode
+
+cvode = new CVode()
+cvode.active(1)
+
+// --------------------------------------------------
+//    Parameter Settings
+// --------------------------------------------------
+ChRexp = 1.5e-3 //  ChR expression density   
+del_light = 105    // delay time before light ON
+t_on = 500  // ms 
+t_off = 200
+n_pulses = 1
+pd = 17  // mW/mm2  light intensity
+
+tstop = del_light+t_on+t_off
+v_init = -70
+
+
+//========== define the cell (here only soma) ===================
+create soma
+access soma
+soma {
+    nseg = 1
+    diam = 20
+    L = 20
+    Ra = 100
+    areas=3.1415*diam*L
+
+//====== insert the mechanisms (Hodgkin-Huxley model here) =======
+        insert hh
+//  insert pas
+}
+
+// ====== ChR2 inclusion =====================================
+
+// parameters for the pump are: e1, k20, k3dark, k3light
+   e1 = 0.008   // 
+   e3 = 0.002  //
+ 
+   b10 = 0.12
+   a30 = 0.025
+
+   a2dark  = 0.022
+   a2light = 0.0114
+   b2dark  = 0.011
+   b2light = 0.0044
+
+   gama = 0.08
+   
+   objref ChRcurr
+    ChRcurr = new ChR(0.5)
+          ChRcurr.gbar= ChRexp*areas 
+          ChRcurr.Er=pd         
+          ChRcurr.del=del_light
+      ChRcurr.ton=t_on        
+          ChRcurr.toff=t_off      
+      ChRcurr.e1=e1
+      ChRcurr.e3=e3
+      ChRcurr.b10=b10
+      ChRcurr.a30=a30
+      ChRcurr.a2dark=a2dark
+      ChRcurr.a2light=a2light
+      ChRcurr.b2dark=b2dark
+      ChRcurr.b2light=b2light
+      ChRcurr.gama=gama
+
+//          ChRcurr.num=n_pulses 
+
+
+// ====== voltage clamp for obesrving only current ===============
+   objref Vclmp
+    Vclmp = new SEClamp(.5)  // voltage-clamp at Vclmp.amp1
+      Vclmp.dur1=tstop-10
+      Vclmp.amp1=-70
+        // dur1 dur2 dur3 -- ms
+        // amp1 amp2 amp3 -- mV
+        // rs -- MOhm   vc -- mV  i -- nA
+/*
+when using stimulation current comment out voltage clamp above and vice versa!!
+//======= stimulation current =====================================
+ objectvar stim
+     soma stim = new IClamp(0.5)
+     stim.del = 250
+     stim.dur = 500
+     stim.amp = 0.1
+*/
+
+//======================== recording settings ============================
+objref vsoma, i_ChR, tvec
+vsoma = new Vector()
+i_ChR = new Vector()
+tvec = new Vector()
+
+// access soma
+cvode.record(&v(0.5),vsoma,tvec)
+cvode.record(&ChR[0].iChR,i_ChR,tvec)
+
+//======================= plot settings ============================
+
+objref graphV, graphI
+
+graphV = new Graph()
+graphV.size(0,tstop,-80,40)
+graphV.label(0.5,0.95,"V")
+
+graphI = new Graph()
+graphI.size(0,tstop,-1.8,0.01)
+graphI.label(0.5,0.95,"i_ChR")
+
+
+//========= plot experimental results ==============================
+// exp results are taken from Zhang et.al 2007 paper
+// file name: zhang2007gif
+// picture positioning: left corner (xL,yL), and pic size (xrange,yrange)
+// graphI.gif("experiment/zhang2007.gif", xL, yL, xrange, yrange)
+
+//graphI.gif("experiment/zhang2007.gif", 50, -0.014, 1070, 0.06)
+//====== read data from a file =========================
+
+strdef infile_t, infile_1p4, infile_17
+objref f, tmp, tpoints, i_1p4, i_17
+
+n_row = 5334
+n_col = 1
+
+infile_t="experiment/time.dat" // 
+infile_1p4="experiment/E_1p4.dat" // 
+infile_17="experiment/E_17.dat" // 
+
+  f = new File()
+  tmp = new Matrix()
+  tpoints = new Vector() // time information
+  i_1p4 = new Vector() // current information
+  i_17 = new Vector() // current information
+
+  f.ropen(infile_t)
+  tmp.scanf(f,n_row,n_col) // read the data values to tmp matrix
+  tpoints = tmp.getcol(0)    // the frist col is time information
+
+  f.ropen(infile_1p4)
+  tmp.scanf(f,n_row,n_col) // read the data values to tmp matrix
+  i_1p4 = tmp.getcol(0)    // the frist col is time information
+  i_1p4.mul(-1)
+  i_1p4.add(0.03)  // 0.0258
+
+  f.ropen(infile_17)
+  tmp.scanf(f,n_row,n_col) // read the data values to tmp matrix
+  i_17 = tmp.getcol(0)    // the frist col is time information
+  i_17.mul(-1)
+  i_17.add(0.03)  // 0.0258
+
+//grphI.size(0,800,-1,0.05)
+//grphI.label(0.5,0.95,"i_ChR")
+
+//grphI.gif("experiment/boyden2010.gif", 50, 0, 150, 0.5)
+
+
+
+//============ simulation and plot results ============================
+
+init()
+run()
+
+vsoma.plot(graphV,tvec)
+
+i_ChR.plot(graphI,tvec,2,2)
+i_1p4.plot(graphI,tpoints,3,1)
+i_17.plot(graphI,tpoints,3,1)
