@@ -57,6 +57,7 @@ factors = [0.125,0.25,0.5,0.75,1.,1.5,2.] # for vitro
 factors = [0.125,0.25,0.5,0.75,1.] # for vivo
 
 irrs = [0.01,0.02]
+irrs = [0.001,0.002]
 
 
 def get_spiketimes(rate,num_inputs):

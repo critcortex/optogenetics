@@ -50,6 +50,7 @@ class Experiment_140305:
     
         self.collection_branch_total_large = [(3,7),(2,10),(4,6),(10,4),(32,3)]
         self.collection_branch_total_small = [(5,3),(2,5),(30,2),(1,31)]
+        
     
         self.light_on = 1000
         self.light_dur = 1500
@@ -584,7 +585,48 @@ class Experiment_140305:
 
 
 
+    def analyse_vitro(self,etype):
+        
+        af = run_analysis.AnalyticFrame()
+        af.update_params({'tstart':0,'tstop':self.tstop,
+                          'label_format':'irr%.2f_factor%.2f_nb%g_ns%g_nl%g_iclamp%.1f_loc%s'})
+        
+        af.update_params({'tstart':self.light_on,'tstop':self.light_on+self.light_dur,
+                                  'tstart_bg': 0,'tstop_bg':self.light_on,
+                                  'tstart_post':self.light_on+self.light_dur,'tstop_post':self.tstop})
+        
+        #irr0.10_factor0.00_nb2_ns2_nl6_spikes30_loc0_J2.0_NpHR_none_ChR_whole
+        aa = ['_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2]) for tree in self.collection_same_total] 
+        print aa
+        if etype == 'proximal':
+            exp_comp_list = [['irr0.05_factor%.2f'+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'iclamp%.1f'+'_loc%g'%(0)+'_NpHR_%s_ChR_%s'%(optlog,optlog),'tree=%s, %s'%(tree,optlog)] for tree in self.collection_same_total for optlog in self.explist]
+        elif etype == 'soma':
+            exp_comp_list = [['irr0.05_factor%.2f'+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'iclamp%.1f'+'_loc%s'%('soma')+'_NpHR_%s_ChR_%s'%(optlog,optlog),'tree=%s, %s'%(tree,optlog)] for tree in self.collection_same_total for optlog in self.explist]
+        elif etype == 'distal':
+            exp_comp_list = [['irr0.05_factor%.2f'+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'iclamp%.1f'+'_loc%g'%(tree[2]-1)+'_NpHR_%s_ChR_%s'%(optlog,optlog),'tree=%s, %s'%(tree,optlog)] for tree in self.collection_same_total for optlog in self.explist]
+        else:
+            print 'Rethink your choices and rethink your life ...'
+            return
+        
+        print exp_comp_list
+      
+    
+        expss = [ec[0] for ec in exp_comp_list]
+        explabels = [ec[1] for ec in exp_comp_list]
+        print explabels
+        
+        af.populate_expset(self.expbase,expss,explabels, [self.factors,self.freqs])
+    
+        af.submenu_extractSpikes()
+        
+        af.submenu_runFI()
+        for exp in af.experimentset:
+            exp.calculate_responses('FI')
+            exp.calculate_responses('FI_bg')
+            exp.calculate_responses('FI_post')
 
+        af.submenu_save()
+        
 
                             
 if __name__ == '__main__':

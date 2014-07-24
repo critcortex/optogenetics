@@ -1,7 +1,0 @@
-#PBS -N 130624_incr_lighton_Isoma1.1_NpHR_whole_ChR_none_sim  
-#PBS -e 130624_incr_lighton_Isoma1.1_NpHR_whole_ChR_none.err 
-#PBS -o 130624_incr_lighton_Isoma1.1_NpHR_whole_ChR_none.out 
-#PBS -l ncpus=1 -l nodes=1 
-#PBS -l walltime=1:00:00 
-cd ~/exp/optogenetics/ 
-python run_stimulation.py run_from_file 130624_incr_lighton_Isoma1.1_NpHR_whole_ChR_none

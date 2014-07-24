@@ -112,6 +112,9 @@ class Experiment_120614:
         
         
         
+        
+        
+        
     
     
     def run_experiments(self):
@@ -321,7 +324,16 @@ class Experiment_120614:
             pylab.close()
         
             
+    def _plot_Vm_raster(self,filename,color):
         
+        pylab.figure()
+        times,vm = np.loadtxt(filename)
+        pylab.plot(times,vm,color=color,lw=2)
+        pylab.axis('off')
+        pylab.ylim(-20,0)
+        pylab.savefig("%s_vmcolor_raster.png"%filename,transparent=True)
+        pylab.close()
+          
     
     
     def _plot_Vm(self,filename,color):
