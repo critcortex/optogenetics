@@ -61,6 +61,7 @@ dist = [100,-1]
 
 dist_vitro = [100,150]
 dist_vitro = [100.3,100.4]
+dist_vitro = [304,305]
 #irrs = [0]
 #factors = [0]
 #iclamp_amps = [0]
@@ -204,7 +205,7 @@ def scan_locations_optogen_invitro(loc):
                 pp['tstart'] = 0
                 pp['tstop'] = tstop
                 
-                nsites = 3
+                nsites = 4
                 labels = ['stim%g'%i for i in range(nsites)]
                 
                 
@@ -242,6 +243,7 @@ def scan_locations_optogen_invitro(loc):
                            'description':'irr%.3f_factor%.2f_I%.2f_stimloc_%s'%(irr,factor,Ia,stimloc)})
     
                 es.run_single_experiment(expbase, 'missing', pp)
+                #es.run_single_experiment(expbase,'names',pp)
                 count += 1
                 #es.run_single_experiment(expbase, 'local', pp)
                 #return 

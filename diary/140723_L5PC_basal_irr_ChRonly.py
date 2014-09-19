@@ -31,7 +31,7 @@ iclamp_amps = np.arange(0.0,5.51,0.5)
 # In vivo parameters
 freqs = range(20,150,10)
 freqs = range(15,150,10) + [150]
-#freqs = range(15,151,5)
+freqs = range(2,15,2)+range(15,151,5)
 Js = [2.]
 nsite_range = [80]
 dist = [100,-1]
@@ -54,7 +54,10 @@ celltype = 'L5PC'
 #######################
 factors = [0.125,0.25,0.5,1.,2.,4.,8.]
 factors = [0.125,0.25,0.5,0.75,1.,1.5,2.] # for vitro
-factors = [0.125,0.25,0.5,0.75,1.] # for vivo
+factors = [0.001,0.125,0.25,0.5,0.75,1.] # for vivo
+#factors = [0.001]
+
+
 
 irrs = [0.01,0.02]
 irrs = [0.001,0.002]
