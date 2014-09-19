@@ -896,4 +896,207 @@ class FractalNeuron(SimpleNeuron):
         
         
 
+class FractalNeuronRall(SimpleNeuron):
+    """
+    A fractal tree, with the added constraint that each daughter branch obeys
+    the 3/2 power law sum
+    
+    see Rall (19XX), Rall and Rinzel (1973, 1974)
+    """
+    
+    def get_default_params(self):
+        pp = super(FractalNeuronRall,self).get_default_params()
+        
+        params = {'defaultlevel': {'L':50.,
+                            'diam'  : 0.4,
+                            'nseg':  10,
+                            'Ra' : 150,
+                            'mechanisms':['pas']}}
+        #'mechanisms':{'pas': ('pas',{'e':-65,'g':0.0001})} }
+        pp = self.dict_update(pp,params)
+        pp['num_base']=1
+        pp['num_split']=2
+        pp['num_levels']=4
+        return pp
+    
+    
+    
+    def __init__(self,inparams={}):
+                
+        params = self.get_default_params()
+        print 'inparams ================== ',inparams
+        self.params = self.dict_update(params, inparams)
+        print 'used params ================== ',self.params
+        self.generate_membrane_mechanisms()
+        # sectionlists
+        self.domainlists = {}
+        # create soma and populate corresponding domainlist
+        self.soma = self.create_soma(params['soma'])
+        self.domainlists['soma'] = h.List()
+        self.domainlists['soma'].append(self.soma)
+        # create dendrites
+        dendnames = self.__create_fractal_dendrites(params['num_base'],params['num_split'],params['num_levels'])
+        # set subdomain names
+        self.subdomains = ['soma'] + dendnames
+        
+        #super(FractalNeuronRall,self).__init__()
+        
+        print "Created Fractal neuron"
+    
+        # 03/02/2014: note that this will only now work when pt3 is again included in each Section 
+        #self.draw_fractal_tree('%s_nb%g_ns%g_nl%g'%('131220_confirm_fractal',params['num_base'],params['num_split'],params['num_levels']))
+        
+        
+    def __create_fractal_dendrites(self,num_base,num_split,num_levels):
+        
+        dendnames = []
+        if self.params.has_key('level0'):
+            pp = self.params['level0']
+        else:
+            pp = self.params['defaultlevel']
+        
+        diam = pp['diam']
+        
+        #print num_base, '-----------------'
+        for i in range(num_base):
+            #print '\n\n\n------------------ Base %g'%i
+            dn = 'dend%g'%i
+            #print 'creating ',dn
+            # create domainlist
+            self.domainlists[dn] = h.List()
+            # add to domainnames
+            dendnames.append(dn)
+            # create section
+            
+            
+            position,max_subtend_theta,theta = self._get_firstchild_fractal_position(i,num_base,pp['L'])
+            #print 'base_%g = '%i,position,theta
+            
+            pp['parent'] = self.soma
+            pp['startpt'] = [0,0,0]
+            pp['endpt'] = position
+            pp['name'] = dn
+            
+            setattr(self,dn,Section(**pp))
+            # recursive step
+            thisbranch = getattr(self,dn)
+            self.domainlists[dn].append(thisbranch)
+            #print 'creating children'
+            self.__create_child_dendrite(thisbranch,0,num_levels,num_split,name=dn,theta_parent=max_subtend_theta,posn_parent=position,theta_relative=theta,diam_parent=diam)
+            
+        return dendnames
+        
+        
+        
+        
+    def __create_child_dendrite(self,parent_branch,parent_level,max_level,num_split,name,theta_parent,posn_parent,theta_relative,diam_parent):
+        #print('child_dendrite: ', parent_level, max_level)
+        if parent_level+1 >= max_level:
+            #print('oops, should stop here')
+            return 
+        #pp = self.params['level%g'%(parent_level+1)]
+        if self.params.has_key('level%g'%(parent_level+1)):
+            pp = self.params['level%g'%(parent_level+1)]
+        else:
+            pp = self.params['defaultlevel']
+        
+        # calculate the new diameter, so that it follows the 3/2 power law as described in Rall, etc.. 
+        # As all daughter branches have the same diam, we can calc it here
+        diam_child =  (diam_parent**1.5/num_split)**(2./3)
+        #print "diam ",diam_parent,"==>",pp['diam']
+        
+        for j in range(num_split):
+            nn = name+'_%g'%j 
+            #print '-'*(parent_level+1),'creating section ', parent_level+1, j, '----------------------',nn
+            # create section, with this branch as parent
+            
+            position,max_subtend_theta,theta = self._get_child_fractal_position(j,num_split,length=pp['L'],parent_theta_subtend=theta_parent,parent_position=posn_parent,theta_relative=theta_relative)
+            #print 'child_%s = '%nn,position,theta
+            
+            pp['parent'] = parent_branch
+            pp['startpt'] = posn_parent
+            pp['endpt'] = position
+            pp['name'] = nn
+            pp['diam'] = diam_child
+            
+            #print "diam for ",nn,"is ==>",pp['diam']
+            
+            dj =  Section(**pp)
+            # add to domain list
+            parent_family = name.split('_')[0]
+            self.domainlists[parent_family].append(dj)
+            # then do the fractal step
+            self.__create_child_dendrite(dj,parent_level+1,max_level,num_split,name=nn,theta_parent=max_subtend_theta,posn_parent=position,theta_relative=theta,diam_parent=diam_child)
+        
+    def _get_firstchild_fractal_position(self,i,num_siblings,length):
+        origin = np.zeros(3)
+        return self._get_fractal_position(i,num_siblings,parent_theta_subtend=2*math.pi,parent_position=origin,length=length,theta_relative=0,use_theta_offset=False)
+    
+    def _get_child_fractal_position(self,i,num_siblings,parent_theta_subtend,parent_position,length,theta_relative):
+        return self._get_fractal_position(i,num_siblings,parent_theta_subtend,parent_position,length,theta_relative)
+    
+    def _get_fractal_position(self,i,num_siblings,parent_theta_subtend,parent_position,length,theta_relative,use_theta_offset=True):
+        """
+        
+        """
+        #print 'in get_fractal_posn:'
+        # angle relative to origin. Important for grand+children of soma, as everything else is done relative to this
+        # note that if we're at first child, then parent_position = [0,0,0], which gives theta_relative = 0, which is fine.
+        #theta_relative = np.arctan2(parent_position[1],parent_position[0]) 
+        #print 10*' ','theta rel = ', theta_relative
+        #print 10*' ','parent theta = ', parent_theta_subtend
+        
+        # theta offset:  
+        #theta_offset = 0 # TODO give proper value. Should be max of 90, 
+        if use_theta_offset and num_siblings > 1:
+            theta_offset = parent_theta_subtend*0.5*(num_siblings-1)/num_siblings
+        else:
+            theta_offset = 0
+        #print 10*' ','theta_offset = ', theta_offset
+        angle = i*parent_theta_subtend/num_siblings + theta_relative - theta_offset
+        #angle = i*parent_theta_subtend/num_siblings + theta_relative + theta_offset
+        #print 10*' ','base angle = ', i*parent_theta_subtend/num_siblings
+        #print 10*' ','updated angle = ', angle
+        new_position = parent_position + np.array([np.cos(angle)*length, np.sin(angle)*length, 0.])
+        #print 10*' ','new position = ',new_position
+        max_subtend = parent_theta_subtend/(num_siblings+1)
+        return new_position,  max_subtend, angle
+        
+        
+    def get_subdomains(self):
+        return self.domainlists
+    
+    def populate_sectionlists(self):
+        # don't need to do anything as this performed while elements are being created
+        pass
+        
+    def draw_fractal_tree(self,savename):
+        
+        # 03/02/2014: currently doesnt work as our Sections don't support 3d
+        from matplotlib.collections import PolyCollection
+        import matplotlib.pyplot as plt
+        
+        x,y,z,r = self._collect_pt3d()
+        #ss = np.ones(len(x))
+        zips = []
+        for (i,pt) in enumerate(x):
+            zips.append(zip(pt,y[i]))
+        #print zips
+        #z = zip(x, y)
+        polycol = PolyCollection(zips,
+                                 edgecolors='gray', linewidths=2,
+                                 facecolors='gray', closed=False)
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        
+        ax.add_collection(polycol)
+        ax.scatter(x,y)
+        #for z in polys:
+        #    ax.plot(z[0])
+        ax.axis(ax.axis('equal'))
+        
+        fig.savefig('%s.png'%savename)
+       
+        
+        
 

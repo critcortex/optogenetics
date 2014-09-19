@@ -12,7 +12,7 @@ EXPBASE  = '~/git/optogenetics/experiments'
 EXPBASE_ONLY = 'experiments' # equivalent to EXPBASE - EXECBASE
 
 GROUPSERV_LOC = 'smb://bg-thefarm-2012/schultz_group_data/Jarvis_comptogen_simdata/neuron'
-
+EXT_HDD = '/media/Seagate Expansion Drive/ic_desktop/git/optogenetics/experiments/%s'
 
 DEFAULT_WALLTIME = 3
 
@@ -25,6 +25,12 @@ filemaps = {    '*png' : 'img',
                 '*gdf' : 'gdf',
                 '*.err': 'out',
                 '*.out': 'out'}
+
+
+backupmaps = {  'img' : '*png',
+                'pkl' : '*pkl',
+                'analysis': '*png',
+                'gdf' : '*gdf'}
 
 unpackmap = { '*pkl' : 'pkl',
            '*jdf' : 'out'}
@@ -96,12 +102,56 @@ def archive_to_groupserver(expname):
     pass
     
     
+def backup(destination='HDD',exp=None):
+    """
+    Move files to relevant folders, etc.
+    """
+    if destination == 'HDD':
+        destdir = EXT_HDD
+
+    if exp is not None:
+        _backup_exp(exp,destdir)
+        return
+
+    for exp in getexps():
+        _backup_exp(exp,destdir)
+        return
+    
+def _backup_exp(expname,destdir):
+    
+    spacefreedest = destdir.replace(' ','\ ')
+    directory = destdir%(expname)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        print "Created directory:", directory
+    
+    for (k,v) in backupmaps.iteritems():
+        print '%s%s'%(expname,k)
+        print basedir%(expname+'/'+k)
+        
+        directory = destdir%(expname+'/'+k)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+            print "Created directory:", directory
+        #shutil.move('./%s%s'%(expname,k),  basedir%(expname+'/'+v))
+        
+        print('cp %s %s'%(basedir%(expname+'/%s/*'%k),destdir%(expname+'/'+k+'/')))
+        os.system('cp -r %s %s'%(basedir%(expname+'/%s/*'%k),spacefreedest%(expname+'/'+k+'/')))
+        print "Copied %s to %s"%(basedir%(expname+'/%s/*'%k),destdir%(expname+'/'+k))    
+    
+    
 def finish_experiment(expname):
     """
     Move files to relevant folders, etc.
     """
+    
+    
     #TODO: log file
     for (k,v) in filemaps.iteritems():
+        
+        
+        
+        
         print '%s%s'%(expname,k)
         print basedir%(expname+'/'+v)
         #shutil.move('./%s%s'%(expname,k),  basedir%(expname+'/'+v))
@@ -258,6 +308,13 @@ if __name__ == '__main__':
                 finish_experiment(sys.argv[2])
         elif sys.argv[1] == 'unpack':
             unpack(sys.argv[2])
+        
+        elif sys.argv[1] == 'backup':
+            if len(sys.argv) == 3:
+                for exp in getexps():
+                    backup(sys.argv[2],exp)
+            else:
+                backup(sys.argv[2],sys.argv[3])
         
         
         

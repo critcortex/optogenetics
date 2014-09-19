@@ -40,7 +40,7 @@ RC_SETTINGS = {'paper': {'lw': 3,
                          'alpha':0.5,
                          'dpi':100,
                          'colors':['r','b','k','g','y','r','b','k','g','y'],
-                         'cmaps':['jet','spectral','YlGnBu_r','YlOrRd','GnBu','jet']},
+                         'cmaps':['YlGnBu_r','YlOrRd','jet','spectral','YlGnBu_r','YlOrRd','GnBu','jet']},
                'poster': {'lw': 4, 
                           'lines.linewidth':4,
                           'axes.linewidth':2,
@@ -51,7 +51,7 @@ RC_SETTINGS = {'paper': {'lw': 3,
                           'alpha':0.5,
                           'font.size':16,
                           'colors':['r','b','k','g'],
-                          'cmaps':['jet','spectral','YlGnBu_r','YlOrRd','GnBu','jet']}}
+                          'cmaps':['YlGnBu_r','YlOrRd','jet','spectral','YlGnBu_r','YlOrRd','GnBu','jet']}}
 
 
 
@@ -323,7 +323,7 @@ class ExperimentPlotter:
         pylab.ylabel('Output frequency (Hz)')
         pylab.xlabel('Input')
         # increase scale so that we have some space to place the legend
-        pylab.ylim(ymax=pylab.ylim()[1]*1.2)
+        pylab.ylim(ymax=pylab.ylim()[1]*1.2,ymin=-5)
         
         if savefig is not None:
             figname = '%sFI_%s.png'%(savefig,time.strftime('%y%m%d'))

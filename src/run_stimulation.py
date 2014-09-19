@@ -328,10 +328,11 @@ class NeuronExperiment:
                 # DANGER WILL ROBINSON!
                 #string is a function call to select ... so 
                 print 'Got dynamic selection - ', ids[i]
-                print "cell.%s(%s)"%(ids[i][0],ids[i][1])
-                print self.cell
+                print "cell.%s(%s)"%(ids[i][0],ids[i][1]),
+                print self.cell,
                 #secid = getattr(self.cell,ids[i][0])(**ids[i][1])[0]
                 ids_list = getattr(self.cell,ids[i][0])(**ids[i][1])
+                print "... found %g elements"%len(ids_list)
                 random.shuffle(ids_list)
                 secid = ids_list[0]
                 print secid
