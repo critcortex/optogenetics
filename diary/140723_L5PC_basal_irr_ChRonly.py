@@ -429,7 +429,7 @@ def analyse_locations_optogen_invivo():
 def analyse_factors_invivo():
     
     
-    for irr in irrs:
+    for irr in [0.002]: #irrs:
         af = run_analysis.AnalyticFrame()
     
         af.update_params({'tstart':light_on,'tstop':light_on+light_dur,
@@ -446,9 +446,7 @@ def analyse_factors_invivo():
         
         af.populate_expset(expbase,expss,explabels, [freqs])
         
-        
         af.submenu_extractSpikes()
-        
         af.submenu_runFI()
         for exp in af.experimentset:
             exp.calculate_responses('FI')
@@ -458,11 +456,13 @@ def analyse_factors_invivo():
         af.submenu_save()
         af.submenu_print()
         
+        af.perform_analysis()
+        af._calculateModulationIndex()
         
         #af.submenu_plot(0, self.expbase+'FI_gain_irr%.2f_tree%s_varyFactor_exp%s%s_'%(0.05,tree,exp[0],exp[1]))
-        af.submenu_plot(5, expbase+'FI_gain_varyFactor_invivo_irr%g'%irr+'_NpHR_%s_ChR_%s'%(get_optdescript(irr,f)[1],get_optdescript(irr,f)[0]))
-        af.submenu_plot(0, expbase+'FI_gain_varyFactor_invivo_irr%g'%irr+'_NpHR_%s_ChR_%s'%(get_optdescript(irr,f)[1],get_optdescript(irr,f)[0]))
-        af.submenu_plot(10, expbase+'FI_gain_varyFactor_invivo_irr%g'%irr+'_NpHR_%s_ChR_%s'%(get_optdescript(irr,f)[1],get_optdescript(irr,f)[0]))
+        #af.submenu_plot(5, expbase+'FI_gain_varyFactor_invivo_irr%g'%irr+'_NpHR_%s_ChR_%s'%(get_optdescript(irr,f)[1],get_optdescript(irr,f)[0]))
+        #af.submenu_plot(0, expbase+'FI_gain_varyFactor_invivo_irr%g'%irr+'_NpHR_%s_ChR_%s'%(get_optdescript(irr,f)[1],get_optdescript(irr,f)[0]))
+        #af.submenu_plot(10, expbase+'FI_gain_varyFactor_invivo_irr%g'%irr+'_NpHR_%s_ChR_%s'%(get_optdescript(irr,f)[1],get_optdescript(irr,f)[0]))
        
         
     """

@@ -9,6 +9,7 @@ import time
 import pickle as pkl
 import itertools
 import NeuroTools.signals  
+import math
 
 DEFAULT_FREQ = [0.5,1,1.5,2,2.5,4,5,6,7,8,9,10,15,20,30,35,40,45,50]
 DEFAULT_IRRAD = [1,2,5,10,20,50,100]
@@ -31,6 +32,8 @@ EXP_IMG_LOCATION = 'experiments/%s/img/'
 EXP_PKL_LOCATION = 'experiments/%s/pkl/'
 EXP_GDF_LOCATION = 'experiments/%s/gdf/'
 
+CMAPS = ['jet','YlOrRd','YlGnBu_r','spectral','YlGnBu_r','YlOrRd','GnBu','jet']
+
 OPSINS_IPHOTO = {'ChR': False, 
              'NpHR': True,
              'ArchT': True}
@@ -40,7 +43,7 @@ RC_SETTINGS = {'paper': {'lw': 3,
                          'alpha':0.5,
                          'dpi':100,
                          'colors':['r','b','k','g','y','r','b','k','g','y'],
-                         'cmaps':['YlGnBu_r','YlOrRd','jet','spectral','YlGnBu_r','YlOrRd','GnBu','jet']},
+                         'cmaps':CMAPS},
                'poster': {'lw': 4, 
                           'lines.linewidth':4,
                           'axes.linewidth':2,
@@ -51,21 +54,18 @@ RC_SETTINGS = {'paper': {'lw': 3,
                           'alpha':0.5,
                           'font.size':16,
                           'colors':['r','b','k','g'],
-                          'cmaps':['YlGnBu_r','YlOrRd','jet','spectral','YlGnBu_r','YlOrRd','GnBu','jet']}}
+                          'cmaps':CMAPS}}
 
 
 
 class AnalyticFrame:
     
-    def __init__(self):
+    def __init__(self,cmap_index=0):
         self.all_experiments = {} #TODO: include all experiments
         self.experimentset = []
-        self.expplotter = ExperimentPlotter()
+        self.expplotter = ExperimentPlotter(cmap_index)
         self.analysis_params = DEFAULT_ANALYSIS_SETTINGS
         
-        
-    #def add_experimentset(self,expset):
-    #    self.experimentset.append(expset)
     
     def update_params(self,newparams):
         self.analysis_params.update(newparams)
@@ -276,7 +276,24 @@ class AnalyticFrame:
             
         print "Running analysis for experiment", expname
         """
+        
+        
+    def _calculateModulationIndex(self,mitype='MI'):
+        """
+        mitype : MI or MI_bg
+        """
+        
+        m_ChR2 = self.experimentset[0].results[mitype][1] #ChR2 max
+        m_NpHR = self.experimentset[-1].results[mitype][0] # NpHR max
+        return m_ChR2/m_NpHR
+        
+        
+        
 class ExperimentPlotter:
+    
+    def __init__(self,cmap_index=0):
+        self.cmap_index = cmap_index
+        
     
     def print_header(self,plottype,expset):
         print '='*40
@@ -304,6 +321,7 @@ class ExperimentPlotter:
     def plot_FI(self,experimentsets,savefig=None,settings='paper'):
         pylab.close('all')
         rcsettings = RC_SETTINGS[settings]
+        print "-="*20,'cmapindex = ',self.cmap_index
         pylab.figure() 
         intensities = np.linspace(0.1, 0.9, len(experimentsets))
 
@@ -313,7 +331,7 @@ class ExperimentPlotter:
                 print 'exp variables len', len(expset.expvariables[0])
                 print expset.expvariables[0]
                 print 'length FI', len(expset.results['FI'])
-                pylab.plot(expset.expvariables[0],expset.results['FI'],lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][0],intensities[i]),label=expset.get_label())
+                pylab.plot(expset.expvariables[0],expset.results['FI'],lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),label=expset.get_label())
             except:
                 print 'Error with plotting for expset', expset
                 continue
@@ -322,7 +340,6 @@ class ExperimentPlotter:
         
         pylab.ylabel('Output frequency (Hz)')
         pylab.xlabel('Input')
-        # increase scale so that we have some space to place the legend
         pylab.ylim(ymax=pylab.ylim()[1]*1.2,ymin=-5)
         
         if savefig is not None:
@@ -330,114 +347,283 @@ class ExperimentPlotter:
             pylab.savefig(figname)
             print 'Saved figure as %s'%figname        
 
-        # Prettify the legend
-        leg = pylab.legend(loc=2,fancybox=True)
-        leg.get_frame().set_alpha(0.5) 
         
-        if savefig is not None:
-            figname = '%sFI_%s_legend.png'%(savefig,time.strftime('%y%m%d'))
-            pylab.savefig(figname)
-            print 'Saved figure as %s'%figname
-        pylab.close('all')
+        
+        
+    def _sort_xsys(self,xs,ys):
+        data = zip(xs,ys)
+        data.sort(key=lambda tup: (tup[0],tup[1]))
+        xs,ys = zip(*data)
+        return xs,ys
             
+    def _linear(self,x,a,b,c,d):
+        return a*x + b
+    
+    def _d_linear(self,x,a,b,c,d):
+        return a
+    
+    def _log(self,x,a,b,c,d):
+        return a*np.log(x-b)+c
+    
+    def _d_log(self,x,a,b,c,d):
+        return a*1./(x-b)
             
     def _poly(self,x,a,b,c,d):
         return a*x**3 + b*x**2 + c*x + d
     
-    def _exp_poly(self,x,a,b,c,d):
-        return a/(1+np.exp(-c*(x-d))) + b
+    def _d_poly(self,x,a,b,c,d):
+        return 3*a*x**2 + 2*b*x + c
+
+    def _sigmoid(self,x,x0,y0,c,k):
+        return c / (1 + np.exp(-k*(x-x0))) + y0
     
-    def _neg_exp_poly(self,x,a,b,c,d):
-        return a/(1+np.exp(c*(x-d))) + b
+    def _d_sigmoid(self,x,x0,y0,c,k):
+        return (c*k*np.exp(-k*(x-x0))) / (1 + np.exp(-k*(x-x0)))**2
+
+    def _sigmoid_log(self,x,a,b,c,d):
+        pass
+
+    def _get_guesstimate(self,xvals,yvals,polyfn):
+        
+        if polyfn == '_sigmoid':
+            """
+            print np.median(xvals),np.median(yvals)
+            y0guess =  yvals.min()
+            cguess = yvals.max() - yvals.min()
+            #x0guess = should happen where y0 mean value is
+            return [np.median(xvals),y0guess,cguess,1.]
+            """
+            return [1.,1.,1.,0.]
+        elif polyfn == '_poly':
+            return [1.,1.,1.,0.]
+        elif polyfn == '_log':
+            x0 = np.nonzero(yvals)[0][0]
+            print 'First nonzero at index',x0
+            print xvals[x0]
+            return [np.max(xvals),xvals[x0],0.,0.]
+        else:
+            return [1.,1.,1.,0.]
+        
                 
     def plot_fit_FI(self,experimentsets,savefig=None,settings='poster',polyfn='_poly'):
-        pylab.close('all')
-        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig)
-        pylab.close('all')
-        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig,polyfn='_exp_poly')
-        pylab.close('all')
-        #self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig,polyfn='_neg_exp_poly')
         
+        pylab.close('all')
+        
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_poly',polyfn='_poly',p0=[1.,1.,1.,0.])
+        pylab.close('all')
+        
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_sigmoid',polyfn='_sigmoid',p0=None)
+        pylab.close('all')
+        
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_linear',polyfn='_linear',p0=None)
+        pylab.close('all')
+       
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_log',polyfn='_log',p0=None)
+        print "Am in here"
+        pylab.close('all')
+        
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_mixed',polyfn=['_poly','_sigmoid','_linear','_log'],p0=None)
+        pylab.close('all')
+        
+        
+    def _plot_fit_FI(self,experimentsets,savefig=None,settings='poster',polyfn='_poly',p0=None):
+        self._plot_fit_FI_general(experimentsets,'expvariables','FI','Input',savefig,settings,polyfn,p0)
     
-    def _plot_fit_FI(self,experimentsets,savefig=None,settings='poster',polyfn='_poly'):
+    
+    
+    def plot_fit_FI_bg(self,experimentsets,savefig=None,settings='poster',polyfn='_poly'):
+        
+        pylab.close('all')
+        
+        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_poly',polyfn='_poly')
+        pylab.close('all')
+        
+        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_sigmoid',polyfn='_sigmoid',p0=None)
+        pylab.close('all')
+        
+        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_linear',polyfn='_linear',p0=None)
+        pylab.close('all')
+        
+        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_log',polyfn='_log',p0=None)
+        print "Am in here2"
+        pylab.close('all')
+        
+        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_mixed',polyfn=['_poly','_sigmoid','_linear','_log'],p0=None)
+        pylab.close('all')
+        
+        
+        
+        
+    def _plot_fit_FI_bg(self,experimentsets,savefig=None,settings='poster',polyfn='_poly',p0=None):
+        if savefig is not None:
+            savefig += '_bg'
+        self._plot_fit_FI_general(experimentsets,'FI_bg','FI','Background (Hz)',savefig,settings,polyfn,p0)
+
+
+    def _plot_xs_ys(self,xs,ys,fittedxs,fittedys,labels,xlabel,savefig=None,settings='poster'):
+        """
+        Params:
+            xs        list of arrays for each exp set
+            ys        list of arrays for each exp set, for observed data points. Must be same dimensions as ys
+            fittedxs  list of arrays for each expset
+            fittedys  list of arrays for each exp set, for fitted data. ""
+            xlabel    string, describing text on x-axis
+            savefig
+            settings
+            
+        """
         rcsettings = RC_SETTINGS[settings]
         pylab.rcParams.update(rcsettings)
-        poly = getattr(self,polyfn)
         pylab.figure() 
-        intensities = np.linspace(0.1, 0.9, len(experimentsets))
-        from matplotlib import mpl
-        norm = mpl.colors.BoundaryNorm(intensities, len(intensities))
-        
-        #cNorm = colors.Normalize(vmin=0,vmax=1) 
-        #scalarMap = cm.ScalarMappable(norm=cNorm, cmap=cmap)
-        
-        m = cm.ScalarMappable(cmap=rcsettings['cmaps'][0])
+        intensities = np.linspace(0.1, 0.9, len(xs))
+        m = cm.ScalarMappable(cmap=rcsettings['cmaps'][self.cmap_index])
         m.set_array(intensities)
+        
+        for (i,x) in enumerate(xs): 
+                pylab.scatter(x,ys[i],lw=rcsettings['lw']/2,c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),s=rcsettings['lw']*10,facecolor='none',edgecolor=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),alpha=0.6)
+                pylab.plot(fittedxs[i],fittedys[i],lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]))
+            
+        # turn the right and top axes off
+        self.__turn_off_border(pylab.gca())
+        # set labels
+        pylab.ylabel('Output frequency (Hz)')
+        pylab.xlabel(xlabel)
+        
+        pylab.ylim(ymin=-2)
+        pylab.xlim(xmin=-2)
+        
+        cbarlabels = labels
+        dc = intensities[1]-intensities[0]
+        mapint = np.linspace(0.1-dc/2, 0.9+dc/2, len(xs)+1)
+        cb = pylab.colorbar(m,ticks=intensities,boundaries=mapint)
+        cb.set_label('x NpHR Factor')
+        cb.set_ticklabels(cbarlabels)
+        
+        if savefig is not None:
+            figname = '%sFIfit_%s.png'%(savefig,time.strftime('%y%m%d'))
+            pylab.savefig(figname,dpi=rcsettings['dpi'])
+            print 'Saved figure as %s'%figname        
+        
+    def get_derivative(self,fname):
+        return getattr(self,'_d'+fname)
+        
+        
+    def _fit_curve(self,xs,ys,p0,polyfn):
+        """
+        
+        Returns:
+            poly    function itself
+            params   best fit params
+            polyname name of function
+        
+        """
+        max_interation = 10000
+        # make a single polyfn into a list so that the subsequent code works for both single and multiple functions
+        if isinstance(polyfn, str):
+            polyfn = [polyfn]
+        poly = [getattr(self,pfn) for pfn in polyfn]
+        min_rmse = float("inf")
+        best_poly_index = None
+        for (p,pfn) in enumerate(poly):
+            if p0 is None:
+                pguess = self._get_guesstimate(xs,ys,polyfn[p])
+            else:
+                pguess = p0
+            if len(polyfn)>1:
+                # Calculate the RMSE using info from leastsq
+                
+                try:
+                    popt_params, pcov,infodict, errmsg, ier = curve_fit(pfn, xdata=xs, ydata=ys,p0=pguess,full_output=True,maxfev=max_interation)
+                except:
+                    continue
+                chisq=(infodict['fvec']**2).sum()
+                # dof is degrees of freedom
+                dof=len(xs)-len(popt_params)
+                rmse=np.sqrt(chisq/dof)
+                #print('Poly: %s, RMSE = %g'%(pfn,rmse))
+                if rmse < min_rmse:
+                    best_poly_index = p
+                    min_rmse = rmse
+                    p_use = pguess
+            else:
+                # if there's only one method to try .... 
+                print xs
+                print ys
+                cparams,cpcov = curve_fit(pfn, xdata=xs, ydata=ys,p0=p0,maxfev=max_interation)
+                return pfn, cparams,polyfn[0]
+            
+        best_poly = poly[best_poly_index]
+        cparams,cpcov = curve_fit(best_poly, xdata=xs, ydata=ys,p0=p_use,maxfev=max_interation)
+        print "Best poly was %s with a RMSE = %g, params = "%(polyfn[best_poly_index],min_rmse), cparams
+        
+        return best_poly, cparams, polyfn[best_poly_index]
+        
 
-        for (i,expset) in enumerate(experimentsets):
-            try:
+    def _plot_fit_FI_general(self,experimentsets,xval_key,yval_key,xlabel,savefig=None,settings='poster',polyfn='_poly',p0=None):
+        """
+        Does the fitting, and hands over to _plot_xs_ys to do the plotting
+        
+        Params
+            experimentsets
+            xval_key
+            yval_key
+            xlabel
+            savefig
+            settings
+            polyfn
+            p0
+        
+        """
+        
+        
+        obsxs = []
+        obsys = []
+        fittedxs = []
+        fittedys = []
+        labels = []
+        
+        for expset in experimentsets:
             #if True:
-                print 'i=%g, intensities[i]='%i,intensities[i]
-                print 'exp variables len', len(expset.expvariables[0])
-                print expset.expvariables[0]
-                print expset.results
-                print 'length FI', len(expset.results['FI'])
-                xvals = np.linspace(expset.expvariables[0][0], expset.expvariables[0][-1],num=len(expset.expvariables[0]))
+            try:
+                ys = expset.get_property(yval_key)
+                
+                if xval_key == 'expvariables':
+                    # need to take the first expvariables value ... sigh. Such a good reminder to plan first, code second
+                    # TODO : is there a better way to grab the xvals for this scenario
+                    xs = expset.get_property(xval_key,0)
+                    xvals = np.linspace(xs[0], xs[-1],num=len(xs)) 
+                else:
+                    xs = expset.get_property(xval_key)
+                    xvals = xs
+                    
+                xs,ys = self._sort_xsys(xs, ys)
                 svals = np.asarray(xvals).ravel() 
-                fis = np.asarray(expset.results['FI']).ravel()
+                fis = np.asarray(ys).ravel()
                 print fis
-                popt_curve, pcov_curve = curve_fit(poly, svals, fis,p0=[1.,1.,1.,0.])
-                fitted = poly(svals,popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3])
-                #scatter real results, plot trend
-                pylab.scatter(expset.expvariables[0],expset.results['FI'],lw=rcsettings['lw']/2,c=self.__get_color(rcsettings['cmaps'][0],intensities[i]),s=rcsettings['lw']*10,facecolor='none',edgecolor=self.__get_color(rcsettings['cmaps'][0],intensities[i]),alpha=0.6)
-                pylab.plot(svals,fitted,lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][0],intensities[i]),label=expset.get_label())
+                
+                fitted_xvals = np.linspace(xs[0], xs[-1],num=len(xs)*4) # add more data points
+                fitted_svals = np.asarray(fitted_xvals).ravel() 
+                
+                poly,popt_curve,pname = self._fit_curve(svals, fis,p0, polyfn)
+                fitted = poly(fitted_svals,popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3])
+                
+                obsxs.append(xvals)
+                obsys.append(fis)
+                fittedxs.append(fitted_svals)
+                fittedys.append(fitted)
+                labels.append(expset.get_label())
+                
             except:
                 print 'Error with plotting for expset', expset
                 print "Unexpected error:", sys.exc_info()[0]
                 continue
             
-        # turn the right and top axes off
-        self.__turn_off_border(pylab.gca())
-        
-        pylab.ylabel('Output frequency (Hz)')
-        pylab.xlabel('Input')
-        
-        # TODO: add vertical line at x = 0
-        
-        
-        # increase scale so that we have some space to place the legend
-        #pylab.ylim(ymax=pylab.ylim()[1]*1.2)
-        pylab.xlim(expset.expvariables[0][0]-0.2,expset.expvariables[0][-1]+0.2)
-        
-        cbarlabels = [expset.get_label() for expset in experimentsets]
-        dc = intensities[1]-intensities[0]
-        mapint = np.linspace(0.1-dc/2, 0.9+dc/2, len(experimentsets)+1)
-        cb = pylab.colorbar(m,ticks=intensities,boundaries=mapint)
-        cb.set_label('x NpHR Factor')
-        cb.set_ticklabels(cbarlabels)
-        
-        
-        if savefig is not None:
-            figname = '%sFIfit_%s_%s.png'%(savefig,time.strftime('%y%m%d'),polyfn)
-            pylab.savefig(figname,dpi=rcsettings['dpi'])
-            print 'Saved figure as %s'%figname        
-
-        # Prettify the legend
-        leg = pylab.legend(loc=2,fancybox=True)
-        leg.get_frame().set_alpha(0.5) 
-        
-        if savefig is not None:
-            figname = '%sFIfit_%s_%s_legend.png'%(savefig,time.strftime('%y%m%d'),polyfn)
-            pylab.savefig(figname,dpi=rcsettings['dpi'])
-            print 'Saved figure as %s'%figname        
-        
-        
-        
-        
-        
-        
-        
-        
+        # if we actually have something to plot
+        if len(labels)>0:    
+            self._plot_xs_ys(obsxs, obsys, fittedxs, fittedys, labels, xlabel, savefig, settings)
+            
+            
+            
     def plot_FI_compare(self,experimentsets,savefig=None,settings='paper'):
         rcsettings = RC_SETTINGS[settings]
         pylab.rcParams.update(rcsettings)
@@ -481,98 +667,8 @@ class ExperimentPlotter:
                 pylab.savefig(figname,dpi=rcsettings['dpi'])
                 print 'Saved figure as %s'%figname
             pylab.close('all')
-    
-    def plot_fit_FI_bg(self,experimentsets,savefig=None,settings='poster',polyfn='_poly'):
-        pylab.close('all')
-        try:
-            self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig)
-        except:
-            pass
-        pylab.close('all')
-        try:
-            self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig,polyfn='_exp_poly')
-        except:
-            pass
-        pylab.close('all')
-        
-    def _plot_fit_FI_bg(self,experimentsets,savefig=None,settings='poster',polyfn='_poly'):
-        rcsettings = RC_SETTINGS[settings]
-        pylab.rcParams.update(rcsettings)
-        poly = getattr(self,polyfn)
-        pylab.figure() 
-        intensities = np.linspace(0.1, 0.9, len(experimentsets))
-        from matplotlib import mpl
-        norm = mpl.colors.BoundaryNorm(intensities, len(intensities))
-        
-        #cNorm = colors.Normalize(vmin=0,vmax=1) 
-        #scalarMap = cm.ScalarMappable(norm=cNorm, cmap=cmap)
-        
-        m = cm.ScalarMappable(cmap=rcsettings['cmaps'][0])
-        m.set_array(intensities)
-
-        for (i,expset) in enumerate(experimentsets):
-            try:
-                print 'i=%g, intensities[i]='%i,intensities[i]
-                print 'exp variables len', len(expset.expvariables[0])
-                print expset.expvariables[0]
-                print 'length FI', len(expset.results['FI'])
-                xvals = expset.results['FI_bg']
-                svals = np.asarray(xvals).ravel()
-                fis = np.asarray(expset.results['FI']).ravel()
-                svals.sort()
-                fis.sort()
-                print fis
-                popt_curve, pcov_curve = curve_fit(poly, svals, fis,p0=[1.,1.,1.,0.])
-                fitted = poly(svals,popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3])
-                #scatter real results, plot trend
-                pylab.scatter(expset.results['FI_bg'],expset.results['FI'],lw=rcsettings['lw']/2,c=self.__get_color(rcsettings['cmaps'][0],intensities[i]),s=rcsettings['lw']*10,facecolor='none',edgecolor=self.__get_color(rcsettings['cmaps'][0],intensities[i]),alpha=0.6)
-                pylab.plot(svals,fitted,lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][0],intensities[i]),label=expset.get_label())
-            except:
-                print 'Error with plotting for expset', expset
-                print "Unexpected error:", sys.exc_info()[0]
-                continue
             
-        # turn the right and top axes off
-        self.__turn_off_border(pylab.gca())
-        
-        pylab.ylabel('Output frequency (Hz)')
-        pylab.xlabel('Input')
-        
-        # TODO: add vertical line at x = 0
-        
-        
-        # increase scale so that we have some space to place the legend
-        #pylab.ylim(ymax=pylab.ylim()[1]*1.2)
-        #pylab.xlim(expset.expvariables[0][0]-0.2,expset.expvariables[0][-1]+0.2)
-        pylab.xlim(xmin=0)
-        
-        cbarlabels = [expset.get_label() for expset in experimentsets]
-        dc = intensities[1]-intensities[0]
-        mapint = np.linspace(0.1-dc/2, 0.9+dc/2, len(experimentsets)+1)
-        cb = pylab.colorbar(m,ticks=intensities,boundaries=mapint)#mapint)
-        cb.set_label('x NpHR Factor')
-        cb.set_ticklabels(cbarlabels)
-        
-        
-        if savefig is not None:
-            figname = '%sFIfit_bg_%s_%s.png'%(savefig,time.strftime('%y%m%d'),polyfn)
-            pylab.savefig(figname,dpi=rcsettings['dpi'])
-            print 'Saved figure as %s'%figname        
-
-        # Prettify the legend
-        leg = pylab.legend(loc=2,fancybox=True)
-        leg.get_frame().set_alpha(0.5) 
-        
-        if savefig is not None:
-            figname = '%sFIfit_bg_%s_%s_legend.png'%(savefig,time.strftime('%y%m%d'),polyfn)
-            pylab.savefig(figname,dpi=rcsettings['dpi'])
-            print 'Saved figure as %s'%figname        
-        
-        
-        
-        
-        
-    
+            
     def plot_FIphoto(self,experimentsets,savefig=None,settings='paper'):
         #TODO: plot
         pass
@@ -582,7 +678,7 @@ class ExperimentPlotter:
         intensities = np.linspace(0.1, 0.9, len(experimentsets))
         for (i,expset) in enumerate(experimentsets):
             print 'i=%g, intensities[i]='%i,intensities[i]
-            pylab.plot(expset.expvariables,expset.results['FI'],lw=rcsettings['lw'],c=self.get_color(rcsettings['cmaps'][0],intensities[i]),label=expset.get_label())
+            pylab.plot(expset.expvariables,expset.results['FI'],lw=rcsettings['lw'],c=self.get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),label=expset.get_label())
         pylab.ylabel('Output frequency (Hz)')
         pylab.xlabel('Input frequency (Hz)')
         # increase scale so that we have some space to place the legend
@@ -620,7 +716,7 @@ class ExperimentPlotter:
                 (ts,vsoma) = exp.get_voltage_trace()
                 print 'j=%g, intensities[i]='%j,intensities[j],' .................',
                 print exp
-                pylab.plot(ts,vsoma,lw=rcsettings['lw_fine'],c=self.__get_color(rcsettings['cmaps'][0],intensities[j]),alpha=rcsettings['alpha'])
+                pylab.plot(ts,vsoma,lw=rcsettings['lw_fine'],c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[j]),alpha=rcsettings['alpha'])
             self.__turn_off_border(pylab.gca())
             pylab.xlabel('time (ms)')
             pylab.ylabel('v_soma (mV)')
@@ -645,7 +741,7 @@ class ExperimentPlotter:
                 (ts,vsoma) = exp.get_voltage_trace()
                 print 'j=%g, intensities[i]='%j,intensities[j],' .................',
                 print exp
-                pylab.plot(ts,vsoma,lw=rcsettings['lw_fine'],c=self.__get_color(rcsettings['cmaps'][0],intensities[j]),alpha=rcsettings['alpha'])
+                pylab.plot(ts,vsoma,lw=rcsettings['lw_fine'],c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[j]),alpha=rcsettings['alpha'])
             pylab.xlabel('time (ms)')
             pylab.ylabel('v_soma (mV)')
             self.__turn_off_border(pylab.gca())
@@ -683,7 +779,7 @@ class ExperimentPlotter:
                         print 'j=%g, intensities[i]='%j,intensities[j],' .................',
                         print exp
                         ax = fig.gca()
-                        ax.plot(ts,iphoto,lw=rcsettings['lw_fine'],c=self.__get_color(rcsettings['cmaps'][0],intensities[j]),alpha=rcsettings['alpha'])
+                        ax.plot(ts,iphoto,lw=rcsettings['lw_fine'],c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[j]),alpha=rcsettings['alpha'])
                 except:
                     pylab.close(fig)
                     continue
@@ -694,7 +790,7 @@ class ExperimentPlotter:
                 
                 pylab.gcf()
                 inset_ax = pylab.axes([.2, .7, .15, .15])
-                self._plot_injected_current(ies, rcsettings['cmaps'][0], inset_ax)
+                self._plot_injected_current(ies, rcsettings['cmaps'][self.cmap_index], inset_ax)
                 
                 if savefig is not None:
                     figname = '%s_iphoto_trace_%s_%s_expset%g.png'%(savefig,time.strftime('%y%m%d'),opsintype,i)
@@ -733,7 +829,7 @@ class ExperimentPlotter:
                 pylab.close('all')
                 fig = pylab.figure() 
                 ax = fig.gca()
-                ax.plot(ies,iphotos,lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][0],intensities[j]))
+                ax.plot(ies,iphotos,lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[j]))
                 self.__turn_off_border(ax)
                 ax.set_xlabel('I_e (nA)')
                 ax.set_ylabel('I_%s (nA)'%opsintype)
@@ -961,6 +1057,170 @@ class ExperimentPlotter:
                 figname = '%s_%s_trait%s_%s.png'%(savefig,str(expset),t,time.strftime('%y%m%d'))
                 fig.savefig(figname)
                 print 'Saved figure as %s'%figname
+            
+    """   
+        
+    def _old_plot_fit_FI(self,experimentsets,savefig=None,settings='poster',polyfn='_poly',p0=None):
+        rcsettings = RC_SETTINGS[settings]
+        pylab.rcParams.update(rcsettings)
+        poly = getattr(self,polyfn)
+        pylab.figure() 
+        intensities = np.linspace(0.1, 0.9, len(experimentsets))
+        from matplotlib import mpl
+        norm = mpl.colors.BoundaryNorm(intensities, len(intensities))
+        
+        #cNorm = colors.Normalize(vmin=0,vmax=1) 
+        #scalarMap = cm.ScalarMappable(norm=cNorm, cmap=cmap)
+        
+        m = cm.ScalarMappable(cmap=rcsettings['cmaps'][self.cmap_index])
+        m.set_array(intensities)
+
+        for (i,expset) in enumerate(experimentsets):
+            try:
+            #if True:
+                print 'i=%g, intensities[i]='%i,intensities[i]
+                print 'exp variables len', len(expset.expvariables[0])
+                print expset.expvariables[0]
+                print expset.results
+                print 'length FI', len(expset.results['FI'])
+                xvals = np.linspace(expset.expvariables[0][0], expset.expvariables[0][-1],num=len(expset.expvariables[0]))
+                svals = np.asarray(xvals).ravel() 
+                fis = np.asarray(expset.results['FI']).ravel()
+                print fis
+                if p0 is None:
+                    p0 = self._get_guesstimate(expset.expvariables[0],expset.results['FI'],polyfn)
+                popt_curve, pcov_curve = curve_fit(poly, svals, fis,p0)
+                fitted = poly(svals,popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3])
+                #scatter real results, plot trend
+                pylab.scatter(expset.expvariables[0],expset.results['FI'],lw=rcsettings['lw']/2,c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),s=rcsettings['lw']*10,facecolor='none',edgecolor=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),alpha=0.6)
+                pylab.plot(svals,fitted,lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),label=expset.get_label())
+            except:
+                print 'Error with plotting for expset', expset
+                print "Unexpected error:", sys.exc_info()[0]
+                continue
+            
+        # turn the right and top axes off
+        self.__turn_off_border(pylab.gca())
+        
+        pylab.ylabel('Output frequency (Hz)')
+        pylab.xlabel('Input')
+        
+        # TODO: add vertical line at x = 0
+        
+        
+        # increase scale so that we have some space to place the legend
+        #pylab.ylim(ymax=pylab.ylim()[1]*1.2)
+        pylab.xlim(expset.expvariables[0][0]-0.2,expset.expvariables[0][-1]+0.2)
+        
+        cbarlabels = [expset.get_label() for expset in experimentsets]
+        dc = intensities[1]-intensities[0]
+        mapint = np.linspace(0.1-dc/2, 0.9+dc/2, len(experimentsets)+1)
+        cb = pylab.colorbar(m,ticks=intensities,boundaries=mapint)
+        cb.set_label('x NpHR Factor')
+        cb.set_ticklabels(cbarlabels)
+        
+        
+        if savefig is not None:
+            figname = '%sFIfit_%s_%s.png'%(savefig,time.strftime('%y%m%d'),polyfn)
+            pylab.savefig(figname,dpi=rcsettings['dpi'])
+            print 'Saved figure as %s'%figname        
+
+        # Prettify the legend
+        leg = pylab.legend(loc=2,fancybox=True)
+        leg.get_frame().set_alpha(0.5) 
+        
+        if savefig is not None:
+            figname = '%sFIfit_%s_%s_legend.png'%(savefig,time.strftime('%y%m%d'),polyfn)
+            pylab.savefig(figname,dpi=rcsettings['dpi'])
+            print 'Saved figure as %s'%figname        
+        
+                
+    
+     
+    def _old_plot_fit_FI_bg(self,experimentsets,savefig=None,settings='poster',polyfn='_poly',p0=None):
+        
+        rcsettings = RC_SETTINGS[settings]
+        pylab.rcParams.update(rcsettings)
+        poly = getattr(self,polyfn)
+        pylab.figure() 
+        intensities = np.linspace(0.1, 0.9, len(experimentsets))
+        from matplotlib import mpl
+        norm = mpl.colors.BoundaryNorm(intensities, len(intensities))
+        
+        #cNorm = colors.Normalize(vmin=0,vmax=1) 
+        #scalarMap = cm.ScalarMappable(norm=cNorm, cmap=cmap)
+        
+        m = cm.ScalarMappable(cmap=rcsettings['cmaps'][self.cmap_index])
+        m.set_array(intensities)
+
+        for (i,expset) in enumerate(experimentsets):
+            try:
+                print 'i=%g, intensities[i]='%i,intensities[i]
+                print 'exp variables len', len(expset.expvariables[0])
+                print expset.expvariables[0]
+                print 'length FI', len(expset.results['FI'])
+                xvals = expset.results['FI_bg']
+                svals = np.asarray(xvals).ravel()
+                fis = np.asarray(expset.results['FI']).ravel()
+                svals.sort()
+                fis.sort()
+                print fis
+                if p0 is None:
+                    p0 = self._get_guesstimate(expset.results['FI_bg'],expset.results['FI'],polyfn)
+                print "About to fit (old):", svals, fis, p0
+                popt_curve, pcov_curve = curve_fit(poly, svals, fis,p0)
+                fitted = poly(svals,popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3])
+                #scatter real results, plot trend
+                pylab.scatter(expset.results['FI_bg'],expset.results['FI'],lw=rcsettings['lw']/2,c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),s=rcsettings['lw']*10,facecolor='none',edgecolor=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),alpha=0.6)
+                pylab.plot(svals,fitted,lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),label=expset.get_label())
+            except RuntimeError:
+                pylab.scatter(expset.results['FI_bg'],expset.results['FI'],lw=rcsettings['lw']/2,c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),s=rcsettings['lw']*10,facecolor='none',edgecolor=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),alpha=0.6)
+                print 'Error with plotting for expset', expset
+                print "Unexpected error:", sys.exc_info()[0]
+                continue
+            except:
+                print 'Error with plotting for expset', expset
+                print "Unexpected error:", sys.exc_info()[0]
+                continue
+        # turn the right and top axes off
+        self.__turn_off_border(pylab.gca())
+        
+        pylab.ylabel('Output frequency (Hz)')
+        pylab.xlabel('Input')
+        
+        # TODO: add vertical line at x = 0
+        
+        
+        # increase scale so that we have some space to place the legend
+        #pylab.ylim(ymax=pylab.ylim()[1]*1.2)
+        #pylab.xlim(expset.expvariables[0][0]-0.2,expset.expvariables[0][-1]+0.2)
+        pylab.xlim(xmin=-2)
+        
+        cbarlabels = [expset.get_label() for expset in experimentsets]
+        dc = intensities[1]-intensities[0]
+        mapint = np.linspace(0.1-dc/2, 0.9+dc/2, len(experimentsets)+1)
+        cb = pylab.colorbar(m,ticks=intensities,boundaries=mapint)#mapint)
+        cb.set_label('x NpHR Factor')
+        cb.set_ticklabels(cbarlabels)
+        
+        
+        if savefig is not None:
+            figname = '%sFIfit_bg_%s_%s.png'%(savefig,time.strftime('%y%m%d'),polyfn)
+            pylab.savefig(figname,dpi=rcsettings['dpi'])
+            print 'Saved figure as %s'%figname        
+
+        # Prettify the legend
+        leg = pylab.legend(loc=2,fancybox=True)
+        leg.get_frame().set_alpha(0.5) 
+        
+        if savefig is not None:
+            figname = '%sFIfit_bg_%s_%s_legend.png'%(savefig,time.strftime('%y%m%d'),polyfn)
+            pylab.savefig(figname,dpi=rcsettings['dpi'])
+            print 'Saved figure as %s'%figname        
+            
+    
+    """    
+        
 
 class ExperimentSet:
 
@@ -986,6 +1246,23 @@ class ExperimentSet:
 
     def get_label(self):
         return self.label
+    
+    def get_property(self,key,index=None):
+        """ Catch for whether we don't know if it's a label or a dictionary label """
+        print self.results.keys()
+        # try results dictionary first
+        if self.results.has_key(key):
+            return self.results[key]
+        else: # it might be a class property
+            try:
+                if index is None:
+                    return getattr(self,key)
+                elif type(index) is int:
+                    return getattr(self,key)[index]
+            except:
+                print 'No property %s associated with this experiment'%key
+                return None
+            
     
     def populate_experiments(self,exp_params,analysis_params):
         print '='*40
@@ -1013,7 +1290,7 @@ class ExperimentSet:
         print 'Saving ExperimentSet', self.label
         for exp in self.experiments:
             exp.save_results()
-    
+        
     def load_experiments(self):
         print 'Loading ExperimentSet', self.label
         for exp in self.experiments:
@@ -1039,6 +1316,72 @@ class ExperimentSet:
             print 'About to run analysis for ',str(exp)
             exp.calculate_results(analysis_fns, recalc)
             exp.save_results()
+            
+        # calculate experimentset values
+        self.get_datafit()
+        
+    def get_datafit(self):
+        # Try all type of curve to get best fit for injected and bg
+        self.results['MI'] = self._get_modulationIndex('expvariables','FI')
+        try:
+            self.results['MI_bg'] = self._get_modulationIndex('FI_bg','FI')
+        except:
+            pass
+        
+    
+    
+    def _find_nearest(self,array,value):
+        return (np.abs(array-value)).argmin()
+        
+    
+    def _get_modulationIndex(self,fit_key,yval_key,eval_at_x=None):
+        
+        ep = ExperimentPlotter()
+        
+        ys = self.get_property(yval_key)
+        
+        if fit_key == 'expvariables':
+            xs = self.expvariables[0]
+            xvals = np.linspace(xs[0], xs[-1],num=len(xs)) 
+        else:
+            xs = self.get_property(fit_key)
+            # as this is usually an indirect measure i.e. background, it may not be sorted - 
+            # so sort ALONG with the corresponding y-values
+            xs,ys = ep._sort_xsys(xs,ys)
+            xvals = xs
+            
+        svals = np.asarray(xvals).ravel()
+        fis = np.asarray(ys).ravel()
+        
+        fitted_xvals = np.linspace(xvals[0], xvals[-1],num=len(xs)*4) # add more data points
+        fitted_svals = np.asarray(fitted_xvals).ravel() 
+        
+        # find the best fit
+        poly,popt_curve,pname = ep._fit_curve(svals, fis,p0=None,polyfn=['_sigmoid','_poly'])
+        #fittedys = poly(fitted_svals,popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3])
+        # grab the derivative of the best fit
+        d_poly = ep.get_derivative(pname)
+        fitted_dys = d_poly(fitted_svals,popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3])
+        """
+        pylab.figure()
+        pylab.plot(fitted_svals,fittedys)
+        pylab.scatter(svals,fis)
+        pylab.savefig('original_%s_%g_%g_%g_%g.png'%(pname,popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3]))
+        
+        pylab.figure()
+        pylab.plot(fitted_svals,fitted_dys)
+        pylab.savefig('derivative_%s_%g_%g_%g_%g.png'%(pname,popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3]))
+        pylab.close('all')
+        
+        print type(fitted_dys),'------------------------------- %s when calculated on xs[0], xs[-1]=('%(pname),xvals[0], xvals[-1],') are',[fitted_dys.min(),fitted_dys.max()]
+        print "fittedys = ",fitted_dys.min(),fitted_dys.max(),fittedys
+        """
+        # and find the min, max values
+        if eval_at_x is None:
+            return [fitted_dys.min(),fitted_dys.max()]
+        else:
+            # TODO: find x index and corresponding t
+            return fitted_dys[self._find_nearest(fitted_svals, eval_at_x)]
     
     def calculate_responses(self,key,recalc=False):
         print 'calculate responses', key
@@ -1074,6 +1417,7 @@ class ExperimentSet:
             print ' '*indent, '%s'%(val)
         for (k,v) in self.results.iteritems():
             print ' '*indent, '%s = %s'%(k,v)
+            
             
 
 

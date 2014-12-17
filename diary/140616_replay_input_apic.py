@@ -502,3 +502,4 @@ if __name__ == '__main__':
         Experiment_120614(wholecell,inputtype,celltype,spiketrain_type).run_experiments()
     else:
         print "Unknown option - ", sys.argv[1]
+        
