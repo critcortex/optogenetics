@@ -39,14 +39,17 @@ class Experiment_140918:
         self.dist_frac_sections = 50.
 
         ### NB. this collection is the correct collection
-        self.collection_same_total = [(1,1,124),(1,2,7), \
+        # should have been a constant
+        self.collection_same_total_all = [(1,1,124),(1,2,7), \
                                       (2,2,6),(2,7,3),(2,1,62),(2,61,2), \
                                       (4,5,3),(4,2,5),(4,30,2),(4,1,31), \
                                       (11,1,11),(11,10,2), \
                                       (18,1,7),(18,2,3),(18,6,2), \
                                       (31,1,4),(31,3,2), \
                                       (62,1,2),(124,1,1)]
+        self.collection_same_total_subset = self.collection_same_total_all[:15]
         
+        self.collection = self.collection_same_total_subset # Default value
         
         self.light_on = 1000
         self.light_dur = 1500
@@ -139,6 +142,7 @@ class Experiment_140918:
         
         
     def run_collection_generic(self,pp,tree,irr,factor,whole,other_tag_locations=None,runon=True,recordall=False):
+        
         nb,nc,nl = tree
         # neuron model and params
         pp['cell'] = ['Neuron', 'FractalNeuronRall']
@@ -301,10 +305,46 @@ class Experiment_140918:
         print '%g jobs submitted'%count
     
     
+    def run_collection_steadystate(self,collection=None,whole=True,recordall=False):
+        
+        if collection is not None:
+            self.collection = collection
+        
+        count = 0
+        for tree in self.collection:
+            nb,nc,nl = tree
+            if nb == 1 and not whole:
+                continue
+            
+            for factor in self.factors:
+                for irr in self.irrs: 
+                    for Ia in self.clamp_amps:
+                        
+                        for clamploc in [nl-1]: #range(nl):
+                            
+                            labels,locs = self.get_dend0_child_locations(nl)
+                            pp = {}
+                            
+                            
+                            # i clamp doesn't work with such abstract models, so we're not going to use this input, and instead
+                            # supply a regular spike train.
+                            pp['stim_iclamp'] = True
+                            pp['iclamp'] = [{'amp':Ia,'tstim':0., 'duration':self.tstop,'location':labels[clamploc]}]
+                            
+                            pp.update({'expname':self.expbase,
+                                       'description':'irr%.2f_factor%.2f_nb%g_ns%g_nl%g_iclamp%.1f_loc%s'%(irr,factor,nb,nc,nl,Ia,clamploc)})
+                            
+                            self.run_collection_generic(pp,tree,irr,factor,whole,recordall=recordall)
+                            count += 1
+                        
+                    
+        print '%g jobs submitted'%count
+
+
+    
     
     def run_collection_clamp(self,collection,whole=True):
         
-        stim_interval = 50.
         count = 0
         for tree in collection:
             nb,nc,nl = tree
@@ -364,11 +404,14 @@ class Experiment_140918:
         return labels,locs
         
 
-    def run_collection_spiketrain(self,collection,whole=True):
+    def run_collection_spiketrain(self,collection=None,whole=True):
         nsegs = 10
         stim_interval = 50.
         count = 0
-        for tree in collection:
+        if collection is not None:
+            self.collection = collection
+            
+        for tree in self.collection:
             nb,nc,nl = tree
             if nb == 1 and not whole:
                 continue
@@ -379,9 +422,14 @@ class Experiment_140918:
                     for freq in self.freqs:
                         for J in self.Js: 
                             
-                            for clamploc in [nl-1]: #
+                            for (icl,clamploc) in enumerate([nl,nl-1,0,1]): #
                                 ###################################################################
                                 
+                                # TODO : avoid repetition i.e. nl
+                                if nl <= 2 and icl >= 2:
+                                    break
+                                if nl <= 3 and icl == 3:
+                                    break
                                 
                                 pp = {}
                                 
@@ -450,14 +498,18 @@ class Experiment_140918:
                                   'tstart_post':self.light_on+self.light_dur,'tstop_post':self.tstop})
         
         #irr0.10_factor0.00_nb2_ns2_nl6_spikes30_loc0_J2.0_NpHR_none_ChR_whole
-        aa = ['_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2]) for tree in self.collection_same_total] 
+        aa = ['_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2]) for tree in self.collection] 
         ##print aa
         if etype == 'proximal':
-            exp_comp_list = [['irr0.05_factor%.2f'+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'spikes%g'+'_loc%g_J%.1f'%(0,self.Js[0])+'_NpHR_%s_ChR_%s'%(optlog,optlog),'tree=%s, %s'%(tree,optlog)] for tree in self.collection_same_total for optlog in self.explist]
+            exp_comp_list = [['irr%.2f'%(self.irrs[0])+'_factor%.2f'+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'spikes%g'+'_loc%g_J%.1f'%(0,self.Js[0])+'_NpHR_%s_ChR_%s'%(optlog,optlog),'tree=%s, %s'%(tree,optlog)] for tree in self.collection for optlog in self.explist]
+        elif etype == 'periproximal':
+            exp_comp_list = [['irr%.2f'%(self.irrs[0])+'_factor%.2f'+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'spikes%g'+'_loc%g_J%.1f'%(1,self.Js[0])+'_NpHR_%s_ChR_%s'%(optlog,optlog),'tree=%s, %s'%(tree,optlog)] for tree in self.collection for optlog in self.explist]
         elif etype == 'soma':
-            exp_comp_list = [['irr0.05_factor%.2f'+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'spikes%g'+'_loc%s_J%.1f'%('soma',1)+'_NpHR_%s_ChR_%s'%(optlog,optlog),'tree=%s, %s'%(tree,optlog)] for tree in self.collection_same_total for optlog in self.explist]
+            exp_comp_list = [['irr%.2f'%(self.irrs[0])+'_factor%.2f'+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'spikes%g'+'_loc%s_J%.1f'%('soma',1)+'_NpHR_%s_ChR_%s'%(optlog,optlog),'tree=%s, %s'%(tree,optlog)] for tree in self.collection for optlog in self.explist]
         elif etype == 'distal':
-            exp_comp_list = [['irr0.05_factor%.2f'+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'spikes%g'+'_loc%g_J%.1f'%(tree[2]-1,self.Js[0])+'_NpHR_%s_ChR_%s'%(optlog,optlog),'tree=%s, %s'%(tree,optlog)] for tree in self.collection_same_total for optlog in self.explist]
+            exp_comp_list = [['irr%.2f'%(self.irrs[0])+'_factor%.2f'+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'spikes%g'+'_loc%g_J%.1f'%(tree[2]-1,self.Js[0])+'_NpHR_%s_ChR_%s'%(optlog,optlog),'tree=%s, %s'%(tree,optlog)] for tree in self.collection for optlog in self.explist]
+        elif type(etype) is int:
+            exp_comp_list = [['irr%.2f'%(self.irrs[0])+'_factor%.2f'+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'spikes%g'+'_loc%g_J%.1f'%(tree[2]-etype,self.Js[0])+'_NpHR_%s_ChR_%s'%(optlog,optlog),'tree=%s, %s'%(tree,optlog)] for tree in self.collection for optlog in self.explist]            
         else:
             print 'Rethink your choices and rethink your life ...'
             return
@@ -591,6 +643,8 @@ class Experiment_140918:
         print aa
         if etype == 'proximal':
             exp_comp_list = [['irr0.05_factor%.2f'+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'iclamp%.1f'+'_loc%g'%(0)+'_NpHR_%s_ChR_%s'%(optlog,optlog),'tree=%s, %s'%(tree,optlog)] for tree in self.collection_same_total for optlog in self.explist]
+        elif etype == 'periproximal':
+            exp_comp_list = [['irr0.05_factor%.2f'+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'iclamp%.1f'+'_loc%g'%(1)+'_NpHR_%s_ChR_%s'%(optlog,optlog),'tree=%s, %s'%(tree,optlog)] for tree in self.collection_same_total for optlog in self.explist]
         elif etype == 'soma':
             exp_comp_list = [['irr0.05_factor%.2f'+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'iclamp%.1f'+'_loc%s'%('soma')+'_NpHR_%s_ChR_%s'%(optlog,optlog),'tree=%s, %s'%(tree,optlog)] for tree in self.collection_same_total for optlog in self.explist]
         elif etype == 'distal':
@@ -619,11 +673,71 @@ class Experiment_140918:
         af.submenu_save()
         
 
+
+
+class ExpCharacterization150122():
+    
+    
+    def __init__(self):
+        self.es = Experiment_140918('whole','spiketrain')
+        self.es.irrs = [0]
+        self.es.explist = ['none','none']
+        self.es.factors = [0]
+        self.es.freqs = range(10,51,10) #es.freqs + range(2,10,2)
+        
+        self.analyse_150123()
+        
+    def analyse_150122(self):
+        
+        self.es.analyse_this('distal')  # nl -1
+        self.es.analyse_this(0) # nl
+        
+        #self.es.analyse_this('proximal')  # 0
+        self.es.analyse_this('periproximal')  # 1
+        
+    def run_150122(self):
+        self.es.run_collection_spiketrain()
+        
+    def run_150123(self):
+        self.es.freqs = range(2,10,2)
+        self.es.run_collection_spiketrain()
+
+    def analyse_150123(self):
+        self.es.freqs = range(2,10,2)
+        self.es.analyse_this('distal')  # nl -1
+        self.es.analyse_this(0) # nl
+        try: 
+            self.es.analyse_this('proximal')  # 0
+        except:
+            pass
+        
+        try:
+            self.es.analyse_this('periproximal')  # 1
+        except:
+            pass
+
+class ExpSteadyState():
+    
+    def __init__(self):
+        self.es = Experiment_140918('whole','steadystate')
+        self.es.irrs = [0] #,0.05]
+        self.es.factors = [0.] # [0.5,1.,2.]
+        self.es.explist = ['none','none']
+        self.es.clamp_amps = [1.]
+        
+        self.run_150123_steadystate()
+    
+    def run_150123_steadystate(self):
+        
+        self.es.run_collection_steadystate(recordall=True)
+        
+        
                             
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
         print 'Need to specify an input mode'
-    
+        #ExpSteadyState()
+        ExpCharacterization150122()
     elif sys.argv[1] == 'soma':
         wholecell,inputtype = sys.argv[2],sys.argv[3]
         Experiment_140918(wholecell,inputtype).run_collection_spiketrain_soma()
