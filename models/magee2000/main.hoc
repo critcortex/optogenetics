@@ -1,0 +1,125 @@
+// main.hoc
+
+	
+	norm = 0
+	noNorm_gsyn = 760e-6
+
+	print "--------------"
+
+	xopen("orig_ca1.nrn")
+	
+	for i = 0, nDend-1 {
+		d[i] {
+			cm = 1
+			insert pas
+			g_pas = 1/10000
+			e_pas = -65
+			v = -65
+			finitialize(v)
+		}
+	}
+	
+	s {
+		cm = 1
+		insert pas
+		g_pas = 1/10000
+		e_pas = -65
+		v = -65
+		finitialize(v)
+	}
+	
+	forall Ra = 70
+	
+	objref g1
+	g1 = new Graph()
+	g1.size(0, 400, 0,2)
+	g1.erase()
+	g1.begin()
+	
+	objref g2
+	g2 = new Graph()
+	g2.size(0, 20, -65,-64)
+	g2.addvar("s.v(.5)",1,1)
+	g2.exec_menu("Keep Lines")
+	
+	vRest = -65
+	tStop = 50
+	dt = .05
+	
+	s distance()
+	
+	objref s1
+	
+	vTarget = .2
+	minGsyn = 600e-6
+	maxGsyn = 6000e-6
+	incGsyn = 20e-6
+	
+//	wopen("rm10ra70.out")
+	
+	for (i = bApical; i<=eApical; i=i+5) {	
+		gsynBoost = 0
+		d[i] {
+			dist = distance(.5)
+			if(dist <= 330) {
+		
+				for (gsyn = minGsyn; gsyn < maxGsyn; gsyn = gsyn + incGsyn){
+					
+					if (norm == 0)  gsyn = noNorm_gsyn
+		
+					s1 = new AlphaSynapse(.5)
+					s1.gmax = gsyn
+					s1.onset = 0
+					s1.tau = 1
+	
+					t = 0
+
+					vp = vRest
+					vd = vRest
+					forall {
+						v = vRest
+						finitialize(vRest)
+					}
+				
+					// g2.erase()
+					g2.begin()
+
+					while(t < tStop) {
+						fadvance()
+						g2.plot(t)
+						if (s.v(.5) < vp) {
+							tp = t
+							t = tStop
+						}
+						if (d[i].v(.5) > vd) {
+							vd = d[i].v(.5)
+						}
+						vp = s.v(.5)
+					}
+					vp = vp - vRest
+					vd = vd - vRest
+					// print "   ", i, dist, tp, vp, vd, gsyn
+					if (vp >= vTarget || norm == 0){
+						gsynBoost = gsyn
+						gsyn = maxGsyn
+					}
+					g2.flush()
+					doNotify()
+
+				}
+				// print i, dist, tp, vp, vd, gsyn
+				g1.mark(dist, vd, "t",2)
+				g1.mark(dist, vp, "o",2)
+//				fprint("%g %g %g %g %g %g\n",dist, i, gsynBoost, vp, vd, tp)
+				g1.fastflush()
+				doNotify()
+			}
+		}
+	}
+	
+	g1.flush()
+	doNotify()
+	wopen()
+
+	g1.exec_menu("View = plot")
+	g2.exec_menu("View = plot")

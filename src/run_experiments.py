@@ -163,6 +163,7 @@ class ExpSetup():
     
     def get_default_params(self):
         defaultp= {  'expname'           : None,
+                'description'       : '',
                 'experiment_type'   : experiment_type,
                 # neuron params
                 'cell'              : None,
@@ -211,7 +212,9 @@ class ExpSetup():
                                        'g':[],
                                        'i_ChR':[],
                                        'i_NpHR':[]},
-                'plot'              : {}
+                'plot'              : {},
+                'output'            : {'output_pkl': False}
+                
               }
         
         defaultp['savedata'] =True
@@ -233,36 +236,50 @@ class ExpSetup():
         paramlist = []
         expdict['expname_family']=expname   
         
-        for (i,khr) in enumerate(expdict['NpHR_areas'].keys()): # loop for NpHR expression
-    
-            for (j,kch) in enumerate(expdict['ChR_areas'].keys()):
-    
-                
-                ChRlocations = expdict['ChR_areas'][kch]
-                ChR_expression = expdict['ChR_times']
-                ChRvalues= [[x,ChR_expression] for x in ChRlocations] 
-                ChR_descript = "ChR_"+kch
-    
-                NpHRlocations = expdict['NpHR_areas'][khr]
-                NpHR_expression = expdict['NpHR_times']
-                NpHRvalues = [[x,NpHR_expression] for x in NpHRlocations]
-                NpHR_descript = "NpHR_"+khr
-    
-                opdict = {  'ChR': ChRvalues , 
-                            'NpHR': NpHRvalues} 
-                
-                #expdict['expname']=expname+expdict['description']+"_%g_"%i+NpHR_descript+"_%g_"%j+ChR_descript
-                expdict['expname']=expname+expdict['description']+'_%s_%s'%(NpHR_descript,ChR_descript)
-                expdict['opdict']=opdict
-    
-                if expdict['logdata']:
-                    fio.log_message('About to run an experiment name:%s\nParams:'%expname)
-                    for p in sorted(expdict.keys(),key=str.lower):
-                        fio.log_message("Param: %s = \t%s"%(p,expdict[p]),timenow=False)
-                        
-                #print expdict['expname']
-                paramlist.append(copy.deepcopy(expdict))
-        #print paramlist
+        if len(expdict['NpHR_areas'].keys()) > 0 and len(expdict['ChR_areas'].keys()) > 0:
+        
+            for (i,khr) in enumerate(expdict['NpHR_areas'].keys()): # loop for NpHR expression
+        
+                for (j,kch) in enumerate(expdict['ChR_areas'].keys()):
+        
+                    
+                    ChRlocations = expdict['ChR_areas'][kch]
+                    ChR_expression = expdict['ChR_times']
+                    ChRvalues= [[x,ChR_expression] for x in ChRlocations] 
+                    ChR_descript = "ChR_"+kch
+        
+                    NpHRlocations = expdict['NpHR_areas'][khr]
+                    NpHR_expression = expdict['NpHR_times']
+                    NpHRvalues = [[x,NpHR_expression] for x in NpHRlocations]
+                    NpHR_descript = "NpHR_"+khr
+        
+                    opdict = {  'ChR': ChRvalues , 
+                                'NpHR': NpHRvalues} 
+                    
+                    #expdict['expname']=expname+expdict['description']+"_%g_"%i+NpHR_descript+"_%g_"%j+ChR_descript
+                    expdict['expname']=expname+expdict['description']+'_%s_%s'%(NpHR_descript,ChR_descript)
+                    expdict['opdict']=opdict
+        
+                    if expdict['logdata']:
+                        fio.log_message('About to run an experiment name:%s\nParams:'%expname)
+                        for p in sorted(expdict.keys(),key=str.lower):
+                            fio.log_message("Param: %s = \t%s"%(p,expdict[p]),timenow=False)
+                            
+                    #print expdict['expname']
+                    paramlist.append(copy.deepcopy(expdict))
+        
+        else:
+            expdict['expname']=expname+expdict['description']
+            expdict['opdict']={}
+        
+            if expdict['logdata']:
+                fio.log_message('About to run an experiment name:%s\nParams:'%expname)
+                for p in sorted(expdict.keys(),key=str.lower):
+                    fio.log_message("Param: %s = \t%s"%(p,expdict[p]),timenow=False)
+                    
+            paramlist.append(copy.deepcopy(expdict))
+        
+        
         return paramlist
 
 
@@ -284,7 +301,7 @@ class ExpSetup():
                 # if it already exists, we don't need to run
                 #print '---------------------------- would not run'
                 return 
-        print 'would run ', expbase+params['description']
+        #print 'would run ', expbase+params['description']
         self.main(expbase,params,runon=runon)                    
     
     def run_frequency_range(self,expbase,freqs=[0.5,1,2.5,5,10],pulsewidth=10.,transient=200.,n_pulses=10,runon='local',params={},offset_phase=0.5):
@@ -407,7 +424,8 @@ class ExpSetup():
             
             if runjob:
                 self.submit_to_cluster(exp['expname'])
-       
+            
+            
     def main_run_missing(self,expname,newparams):
         # check whether job exists in main location
         exps = self.generate_params(expname,newparams)[0]

@@ -1,0 +1,40 @@
+load_file("nrngui.hoc")
+
+objref fig4_box, fig4_subbox_ab, fig4_subbox_cd, shape_plot_win
+fig4_box = new VBox()
+fig4_box.intercept(1)
+
+	xpanel("ab")
+	fig4_subbox_ab = new HBox()
+	xpanel()
+
+	fig4_subbox_ab.intercept(1)
+
+
+		xpanel("b")
+		load_file("main_soma.hoc")
+		xpanel()
+
+	fig4_subbox_ab.intercept(0)
+
+	fig4_subbox_cd = new HBox()
+	fig4_subbox_cd.intercept(1)
+
+		xpanel("c")
+		//load_file("main_example_epsps.hoc")
+		xpanel()
+
+	fig4_subbox_cd.intercept(0)
+	fig4_subbox_cd.map()
+
+// now that shape is loaded add the morphology graph
+	fig4_subbox_ab.intercept(1)
+
+		load_file("shape_plot.ses")
+		
+	fig4_subbox_ab.intercept(0)
+	fig4_subbox_ab.map()
+
+fig4_box.intercept(0)
+fig4_box.map()
+

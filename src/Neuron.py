@@ -5,18 +5,32 @@ import numpy as np
 import math
 from LFPy import Cell
 import collections
+from matplotlib.collections import LineCollection
 
 
 class NeuronInterface(Cell):
+    """
+    
+    
+    Class data structures:
+        allseclist : type  = neuron.h.SectionList() [from LFPy/cell.py]
+        domainlists : type = dict [either in implemented interfaced]
+    
+    
+    """
     
     def __init__(self):
         """
         Create cell. Uses a whole bunch of methods from LFPy
         """
-        self._create_sectionlists()
         
+        self._create_sectionlists()
+        """
+        print('print allseclist --->')
         for sec in self.allseclist:
             print sec.name()
+        print('/allseclist')
+        """
         self.totnsegs = self._calc_totnsegs()
         self.verbose = True
         print "About to collect geometry"
@@ -26,19 +40,18 @@ class NeuronInterface(Cell):
         #self.populate_sectionlists()
         self.populate_subdomain_lists()
         
-        print '-----------------------------------'
+        """
         ss = self.domainlists['soma']
+        print ss
         for sec in ss.allsec():
-            print sec.name()
-        print '-----------------------------------'
-            
-        
-        #self.generate_seg_section()
+            pass #print sec.name()
+        """
+         
         try:
-            self.generate_seg_section()
-            
+            self.generate_seg_section()    
         except:
             print "Could not generate segment sections"
+    
     
     def get_cell(self):
         raise NotImplementedError( "Not implemented")
@@ -141,36 +154,53 @@ class NeuronInterface(Cell):
         """
         Automated way of populating domain/section lists
         """
-        self.domainlists = {}
+        # First, check whether self.domainlists has already been populated or not
+        # If it has, then we just leave the lists as is
+        # Note that we could use hasattr, but following Pythonic practice of asking forgiveness than asking 
+        # permission, we instead use try/except (see StackOverflow: qn 610883)
+        try:
+            
+            if self.domainlists is not None:
+                return
+        except AttributeError:
+            
+            # Else, go through and populate them:
+            # This method assumes that sections/segments are named in the format: 
+            #     l5pc.basal[1] 
+            #     stellate.dend0[45]
+            
+            self.domainlists = {}
+            for sec in self.allseclist:
+                name = sec.name()
+                domain_info = name.split('.')[-1].split('[')[0]
+                #print name, domain_info
+                if not self.domainlists.has_key(domain_info):
+                    print 'Added subdomain info for - ', domain_info
+                    self.domainlists[domain_info] = h.List()
+                #print '-: ', sec.name(), '-->', domain_info
+                self.domainlists[domain_info].append(sec)
         
-        for sec in self.allseclist:
-            name = sec.name()
-            domain_info = name.split('.')[-1].split('[')[0]
-            print name, domain_info
-            if not self.domainlists.has_key(domain_info):
-                print 'Added subdomain info for - ', domain_info
-                self.domainlists[domain_info] = h.List()
-            print '-: ', sec.name(), '-->', domain_info
-            self.domainlists[domain_info].append(sec)
-    
         
     def generate_seg_section(self):
-        #print 'generating segsection'
+        
         self.seg_sec = {}
         for subdom in self.get_subdomains():
-            #print 'subdom = ', subdom
             self.seg_sec[subdom] = {}
+            
             for idx in self.get_idx(subdom):
                 idxname = self.get_idx_name(int(idx))[1]
                 #print '--', idx, idxname
                 #print [(i,s) for (i,s) in enumerate(self.get_subdomain_list(subdom)) ]
                 sec = [(i,s) for (i,s) in enumerate(self.get_subdomain_list(subdom)) if s.name() == idxname]
-                #print sec
                 self.seg_sec[subdom][int(idx)] = (sec[0][0],sec[0][1], self.get_idx_name(int(idx))[2])
         #print self.seg_sec
     
-    def get_section_byname(self,sectioname,subdomain):
-        sec =  [(i,s) for (i,s) in enumerate(self.get_subdomain_list(subdomain)) if s.name() == sectioname]
+    def get_section_byname(self,sectioname,subdomain=None):
+        if subdomain is not None:
+            sec =  [(i,s) for (i,s) in enumerate(self.get_subdomain_list(subdomain)) if s.name() == sectioname]
+        else:
+            sec =  [(i,s) for (i,s) in enumerate(self.allseclist) if s.name() == sectioname]
+            
         if len(sec) == 0:
             return None
         else:
@@ -200,6 +230,7 @@ class NeuronInterface(Cell):
     def get_subdomain_list(self,name):
         #print 'get_subdomain_list: Was asked for name=',name
         #print 'type = ',self.domainlists[name].hname()
+        #print self.domainlists, name
         try:
             return self.domainlists[name]
         except:
@@ -214,8 +245,76 @@ class NeuronInterface(Cell):
         print 'Initialization of cell type not implemented. If segmentation faults exist, could be a reason why ... '
         
 
+    def get_idx_polygons_xy(self):
+        '''for each segment idx in celll create a polygon in the (x,z)-plane,
+        that can be visualized using plt.fill() or
+        mpl.collections.PolyCollection
+        
+        Returned argument is a list of (np.ndarray, np.ndarray) tuples
+        giving the trajectory of each section
+        
+        The most efficient way of using this would be something like
+        ::
+            from matplotlib.collections import PolyCollection
+            import matplotlib.pyplot as plt
+            
+            cell = LFPy.Cell(morphology='PATH/TO/MORPHOLOGY')
+            
+            zips = []
+            for x, z in cell.get_idx_polygons():
+                zips.append(zip(x, z))
+            
+            polycol = PolyCollection(zips,
+                                     edgecolors='none',
+                                     facecolors='gray')
+            
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            
+            ax.add_collection(polycol)
+            ax.axis(ax.axis('equal'))
+            
+            plt.show()
+        '''
+        polygons = []
+        for i in np.arange(self.totnsegs):
+            polygons.append(self._create_segment_polygon_xy(i))
+        
+        return polygons
 
-    
+    def _create_segment_polygon_xy(self,i):
+        '''create a polygon to fill for segment i'''        
+        x = [self.xstart[i], self.xend[i]]
+        y = [self.ystart[i], self.yend[i]]
+        d = self.diam[i]
+        
+        #calculate angles        
+        dx = np.diff(x)
+        dy = np.diff(y)
+        theta = np.arctan2(dy, dx)
+        
+        x = np.r_[x, x[::-1]]
+        y = np.r_[y, y[::-1]]
+                
+        #1st corner:
+        x[0] -= 0.5 * d * np.sin(theta)
+        y[0] += 0.5 * d * np.cos(theta)
+                
+        #end of section, first side
+        x[1] -= 0.5 * d * np.sin(theta)
+        y[1] += 0.5 * d * np.cos(theta)
+        
+        #other side
+        #end of section, second side
+        x[2] += 0.5 * d * np.sin(theta)
+        y[2] -= 0.5 * d * np.cos(theta)
+        
+        #last corner:
+        x[3] += 0.5 * d * np.sin(theta)
+        y[3] -= 0.5 * d * np.cos(theta)
+        
+        return x, y
+
 
     def dict_update(self,d, u):
         """
@@ -382,7 +481,7 @@ class L5PC(NeuronInterface):
         for subd in self.get_subdomains():
             self.domainlists[subd] = h.List() #h.SectionList()
         
-        print self.domainlists['soma'].hname()
+        #print self.domainlists['soma'].hname()
         
         for (i,sec) in enumerate(self.allseclist):
             try:               
@@ -484,28 +583,45 @@ class Section(nrn.Section):
         
         if name is not None:
             nrn.Section.__init__(self,name=name)
+            #self.name = name
+            #h.Section.__init__(self,name=name)
         else:
             nrn.Section.__init__(self)
+            #h.Section.__init__(self)
+        
+        print h.secname(sec=self), 
+        print ("--------")
         
         if startpt is not None and endpt is not None:
             self.startpt = startpt
             self.endpt = endpt
+            print "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<", startpt, endpt
             """
             SJ: Previously, I had neuron sections using pt3, but recently found that this
                 caused the NEURON ODE solver to break (don't ask). Here are remnants of my 
                 (unsuccessful) attempts to get it working again. 
             """
+            """
             # Attempt 1 
-            #h.pt3dclear(sec=self)
-            #self.push()
-            #h.pt3dadd(startpt[0],startpt[1],startpt[2],diam)
-            #h.pt3dadd(endpt[0],endpt[1],endpt[2],diam)
-            #h.pop_section()
+            h.pt3dclear(sec=self)
+            self.push()
+            h.pt3dadd(startpt[0],startpt[1],startpt[2],diam)
+            h.pt3dadd(endpt[0],endpt[1],endpt[2],diam)
+            h.pop_section()
+            """
+            """
+            
             # Attempt 2
-            #h.pt3dclear(sec=self)
-            #h.pt3dadd(startpt[0],startpt[1],startpt[2],diam,sec=self)
-            #h.pt3dadd(endpt[0],endpt[1],endpt[2],diam,sec=self)
+            h.pt3dclear(sec=self)
+            h.pt3dadd(startpt[0],startpt[1],startpt[2],diam,sec=self)
+            h.pt3dadd(endpt[0],endpt[1],endpt[2],diam,sec=self)
             #cellparams
+            """
+            """
+            # Attempt 3
+            h.pt3dadd(startpt[0],startpt[1],startpt[2],diam,sec=self)
+            h.pt3dadd(endpt[0],endpt[1],endpt[2],diam,sec=self)
+            """
         # set geometry
         self.L = L
         self.diam = diam
@@ -546,6 +662,8 @@ class Section(nrn.Section):
         self.spikecount.thresh = threshold
         self.spikecount.record(self.spiketimes)
 
+    def __str__(self):
+        return "Section: %s, d=%g"%(h.secname(sec=self), self.diam)
 
 
 class SimpleNeuron(NeuronInterface):
@@ -586,6 +704,7 @@ class SimpleNeuron(NeuronInterface):
         #pas = Mechanism('pas', {'e':-65,'g':0.0001})
         params = {'soma': {'L':10,
                            'diam':10,
+                           'nseg':1,
                            'Ra':150,
                            'name':'soma',
                            'startpt':[0,0,0],
@@ -621,6 +740,76 @@ class SimpleNeuron(NeuronInterface):
         for (key,val) in self.params.iteritems():
             if type(val) is dict and val.has_key('mechanisms'):
                 self.params[key]['mechanisms'] = [ self.mechanisms[mk] for mk in val['mechanisms']]
+        
+        
+        
+    def check_3d(self):
+        """
+        ss = self.get_section_byname('dend0_0','dend0')[0][1]
+        print type(ss)
+        print ss
+        print ss.endpt
+        
+        print ">>>>>>>>>>>>>>>>>>>>dfsdf>>>>>>>>>>>>>>>>>>>>>"
+        for sec in self.allseclist:
+            h.pt3dclear(sec=sec)
+            # get the Python version of the object
+            ss = self.get_section_byname(sec.name())[0][1]
+            startpt = ss.startpt
+            endpt = ss.endpt
+            diam = ss.diam
+            print sec.name(), startpt, endpt, diam
+            h.pt3dadd(startpt[0],startpt[1],startpt[2],diam)
+            h.pt3dadd(endpt[0],endpt[1],endpt[2],diam)
+        print ">>>>>>>>>>>>>>>>>>>>>sdfsdf>>>>>>>>>>>>>>>>>>>>"
+
+        """
+
+        print ">>>>>>>>>>>>>>>>>>>>y546dfgdfgdfg>>>>>>>>>>>>>>>>>>>>>"
+        for dom in self.get_subdomains():
+            print 'dom .... ' , dom
+            #if dom == 'soma':
+            #    continue
+            for sec in self.domainlists[dom]:
+                h.pt3dclear(sec=sec)
+                # get the Python version of the object
+                ss = self.get_section_byname(sec.name(),dom)[0][1]
+                startpt = ss.startpt
+                endpt = ss.endpt
+                diam = ss.diam
+                print sec.name(), startpt, endpt, diam
+                h.pt3dadd(startpt[0],startpt[1],startpt[2],diam,sec=sec)
+                h.pt3dadd(endpt[0],endpt[1],endpt[2],diam,sec=sec)
+        print ">>>>>>>>>>>>>>>>>>>>>dfgdfgdfg>>>>>>>>>>>>>>>>>>>>"
+
+
+        """
+        i = 0
+        #for sec in self.allseclist:
+        for sec in h.allsec():   
+            print ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>",sec
+            print sec.name() 
+            #sec = h.
+            n3d = int(h.n3d())
+            for i in range(0,n3d):
+                print '--- i: ' + str(i) + ' ---'
+                print 'x:  ' + str(h.x3d(i,sec=sec))
+                print 'y:  ' + str(h.y3d(i,sec=sec))
+                print 'z:  ' + str(h.z3d(i,sec=sec))
+    
+                
+                h.pt3dchange(n,
+                                self.x3d[i][n],
+                                self.y3d[i][n],
+                                self.z3d[i][n],
+                                self.diam3d[i][n])
+                
+            i += 1
+            #let NEURON know about the changes we just did:
+            h.define_shape()
+        
+        """
+        
         
 class SimpleBipolar(SimpleNeuron):
     
@@ -939,13 +1128,23 @@ class FractalNeuronRall(SimpleNeuron):
         # set subdomain names
         self.subdomains = ['soma'] + dendnames
         
-        #super(FractalNeuronRall,self).__init__()
+        super(FractalNeuronRall,self).__init__()
         
+        
+        #self.draw_fractal_tree('%s_nb%g_ns%g_nl%g'%('131220_confirm_fractal_old',params['num_base'],params['num_split'],params['num_levels']))
+        
+        #try:
+        super(FractalNeuronRall,self).check_3d()
+        #except:
+        #    print("Attempted to fix 3d points")
+            
         print "Created Fractal neuron"
     
         # 03/02/2014: note that this will only now work when pt3 is again included in each Section 
-        #self.draw_fractal_tree('%s_nb%g_ns%g_nl%g'%('131220_confirm_fractal',params['num_base'],params['num_split'],params['num_levels']))
+        self.draw_fractal_tree('%s_nb%g_ns%g_nl%g'%('131220_confirm_fractal',params['num_base'],params['num_split'],params['num_levels']))
         
+        
+               
         
     def __create_fractal_dendrites(self,num_base,num_split,num_levels):
         
@@ -955,11 +1154,11 @@ class FractalNeuronRall(SimpleNeuron):
         else:
             pp = self.params['defaultlevel']
         
-        diam = pp['diam']
+        basediam = pp['diam']
         
         #print num_base, '-----------------'
         for i in range(num_base):
-            #print '\n\n\n------------------ Base %g'%i
+            print '\n\n\n------------------ Base %g'%i
             dn = 'dend%g'%i
             #print 'creating ',dn
             # create domainlist
@@ -967,7 +1166,7 @@ class FractalNeuronRall(SimpleNeuron):
             # add to domainnames
             dendnames.append(dn)
             # create section
-            
+            diam = basediam
             
             position,max_subtend_theta,theta = self._get_firstchild_fractal_position(i,num_base,pp['L'])
             #print 'base_%g = '%i,position,theta
@@ -976,6 +1175,7 @@ class FractalNeuronRall(SimpleNeuron):
             pp['startpt'] = [0,0,0]
             pp['endpt'] = position
             pp['name'] = dn
+            pp['diam'] = diam  # have to reset
             
             setattr(self,dn,Section(**pp))
             # recursive step
@@ -1073,24 +1273,37 @@ class FractalNeuronRall(SimpleNeuron):
     def draw_fractal_tree(self,savename):
         
         # 03/02/2014: currently doesnt work as our Sections don't support 3d
-        from matplotlib.collections import PolyCollection
         import matplotlib.pyplot as plt
         
         x,y,z,r = self._collect_pt3d()
-        #ss = np.ones(len(x))
+        
+        
+        print x[0]
+        print '---------------'
+        print y[0]
+        print '======================================='
+        
+        xs = x[0]
+        ys = y[0]
+        lines = []
+        for i in range(0,len(xs),2):
+            ll = [[xs[i],ys[i]],[xs[i+1],ys[i+1]]]
+            lines.append(ll)
+        print lines
+        print '======================================='
+        
         zips = []
-        for (i,pt) in enumerate(x):
-            zips.append(zip(pt,y[i]))
-        #print zips
-        #z = zip(x, y)
-        polycol = PolyCollection(zips,
-                                 edgecolors='gray', linewidths=2,
-                                 facecolors='gray', closed=False)
+        for (i,pt) in enumerate(x[0]):
+            zips.append([pt,y[0][i]])
+        print zips
+        zz = list(zip(x[0], y[0]))
+        print zz
+        polycol = LineCollection(lines) #, edgecolors='gray', linewidths=2, facecolors='gray', closed=False)
         fig = plt.figure()
         ax = fig.add_subplot(111)
         
         ax.add_collection(polycol)
-        ax.scatter(x,y)
+        ax.scatter(x[0],y[0])
         #for z in polys:
         #    ax.plot(z[0])
         ax.axis(ax.axis('equal'))

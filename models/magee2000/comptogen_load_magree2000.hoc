@@ -1,0 +1,124 @@
+
+/* 
+ * Wrapper hoc file for CA1 neuron from Magee et al.
+ * for use with computational optogenetics toolbox
+ *
+ * @author s.jarvis@imperial.ac.uk, 2014
+ * 
+ * Notes: 
+ *      - soma: s
+ *      - dendrites: d
+ */
+    
+norm = 0
+noNorm_gsyn = 760e-6
+begintemplate magee_ca1
+
+print "--------------"
+
+xopen("ca1.nrn")
+    
+print "--------------"
+
+
+    for i = 0, nDend-1 {
+        d[i] {
+            cm = 1
+            insert pas
+            g_pas = 1/10000
+            e_pas = -65
+            v = -65
+            finitialize(v)
+        }
+    }
+    
+    soma {
+        cm = 1
+        insert pas
+        g_pas = 1/10000
+        e_pas = -65
+        v = -65
+        finitialize(v)
+    }
+    
+    forall Ra = 70
+
+    vRest = -65
+    
+    
+endtemplate magee_ca1
+    
+/*    
+    tStop = 50
+    dt = .05
+    
+    s distance()
+    
+    objref s1
+    
+    vTarget = .2
+    minGsyn = 600e-6
+    maxGsyn = 6000e-6
+    incGsyn = 20e-6
+    
+//  wopen("rm10ra70.out")
+    
+    for (i = bApical; i<=eApical; i=i+5) {  
+        print "1 --------------"
+        gsynBoost = 0
+        d[i] {
+            print "di --------------", i
+            dist = distance(.5)
+            if(dist <= 330) {
+                print "dist < 330 --------------", i
+                for (gsyn = minGsyn; gsyn < maxGsyn; gsyn = gsyn + incGsyn){
+                    print "gsyn = ",gsyn
+                    if (norm == 0)  gsyn = noNorm_gsyn
+        
+                    s1 = new AlphaSynapse(.5)
+                    s1.gmax = gsyn
+                    s1.onset = 0
+                    s1.tau = 1
+    
+                    t = 0
+
+                    vp = vRest
+                    vd = vRest
+                    forall {
+                        v = vRest
+                        finitialize(vRest)
+                    }
+                
+                    
+
+                    while(t < tStop) {
+                        fadvance()
+                        
+                        if (s.v(.5) < vp) {
+                            tp = t
+                            t = tStop
+                        }
+                        if (d[i].v(.5) > vd) {
+                            vd = d[i].v(.5)
+                        }
+                        vp = s.v(.5)
+                    }
+                    vp = vp - vRest
+                    vd = vd - vRest
+                    // print "   ", i, dist, tp, vp, vd, gsyn
+                    if (vp >= vTarget || norm == 0){
+                        gsynBoost = gsyn
+                        gsyn = maxGsyn
+                    }
+
+
+                }
+                //print i, dist, tp, vp, vd, gsyn
+
+                fprint("%g %g %g %g %g %g\n",dist, i, gsynBoost, vp, vd, tp)
+
+            }
+        }
+    }
+    
+*/
