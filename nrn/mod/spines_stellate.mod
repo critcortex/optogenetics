@@ -1,0 +1,1 @@
+COMMENT	creates a variable for each section to scale according to spine densityENDCOMMENTNEURON {	SUFFIX spines_stellate	RANGE scale}PARAMETER {	scale = 1}
