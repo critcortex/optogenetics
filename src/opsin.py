@@ -1,18 +1,54 @@
 from neuron import h
+import logging, sys
+
+#Bit of code for logging to stdout rather than to default log file
+#Taken from stackoverflow qn 14058453
+root = logging.getLogger()
+root.setLevel(logging.DEBUG)
+ch = logging.StreamHandler(sys.stdout)
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+root.addHandler(ch)
+# /logging
+
 
 class Opsin:
+    """
+    
+    Designed to work with corresponding .mod files within NEURON
+    
+    Values can be altered by supplying a dictionary of parameters containing an opsindict:
+    opsindict =  {  'exp':5e-4, 
+                    'irradiance' :0.005, 
+                    'pulsewidth': light_dur,
+                    'lightdelay':light_on,
+                    'interpulse_interval':ipi,  
+                    'n_pulses':n_pulses}
+    
+    
+    """
 
         
     def express_opsin(self,cell,params):
+        """
+        Public method for expressing the opsin throughout the entire cell
+        
+        """
         expressed_op = {}
-        print '------ About to start expressing opsins ----------'
-        print 'We observe: ',params['opsindict']
+        logging.info('------ About to start expressing opsins ----------')
+        logging.info('We observe: ',params['opsindict'])
         for opsin in params['opsindict'].keys():
             oplist = h.List()
-            print 'Expressing opsin %s --------------------'%opsin
+            logging.info('Expressing opsin %s --------------------'%opsin)
             for subdomain in params['opsindict'][opsin].keys():
-                print '- expressing %s in %s'%(opsin,subdomain)
-                total = 0
+                logging.info('- expressing %s in %s'%(opsin,subdomain))
+                
+                # get the idx offset. This will only be used if setting unequal illumination
+                idx_offset = cell.get_idx(subdomain)[0]
+                logging.debug('_idx offset = %g'%idx_offset)
+                
+                total = 0  # total sections expressed so far
                 #get corresponding section list
                 sectionlist = cell.domainlists[subdomain]
                 slcount= sectionlist.count()
@@ -21,78 +57,76 @@ class Opsin:
                     sec = sectionlist.o(i)
                     for (j,seg) in enumerate(sec):
                         #print type(seg), type(sec)
-                        op = self._express_opsin_section(seg,sec,opsin,params['opsindict'][opsin][subdomain])
+                        op = self._express_opsin_section(seg,sec,opsin,params['opsindict'][opsin][subdomain],idx_offset+total,cell)
                         oplist.append(op)
                         total +=1
-                print 'Expressed opsin %s in %g segments in subdomain %s'%(opsin,total,subdomain)
-            print '... finished expressing opsin %s'%opsin
+                logging.info('Expressed opsin %s in %g segments in subdomain %s'%(opsin,total,subdomain))
+            logging.info('... finished expressing opsin %s'%opsin)
             expressed_op[opsin] = oplist
-        print '------ Finished expressing opsins ------'
+        logging.info('------ Finished expressing opsins ------')
         return expressed_op
     
+        
+    
     
 
-    def _express_opsin_section(self,segment,section,opsintype,opsindict):
-        """ Expresses opsin in a specific segment """
-
+    def _express_opsin_section(self,segment,section,opsintype,opsindict,idx=None,cell=None,):
+        """ 
+        Expresses opsin in a specific segment.  
+        
+        First, goes through and sets the opsin parameters. 
+        Then, if there is partial illumination, goes through and calculates the effective illumination 
+        seen at this segment. This is calculated in this order to avoid overwriting the calculated "effective" illumination 
+        with the "true" illumination/irradiance 
+        
+        @param
+            segment
+            section
+            opsintype
+            opsindict
+            idx
+            cell
+        
+        """
+        print opsindict
+    
         opsin = getattr(h,opsintype)()
-        opsin.loc(segment.x,sec=section)
+        opsin.loc(segment.x,sec=section) 
         opsin.gbar = opsindict['exp']*h.area(segment.x)
-                
+        
         for (k,v) in opsindict.iteritems():
-            if k=='exp':
+            # Note that we have a couple of special cases we have to ignore (and cannot delete from the dictionary)
+            if k in ['exp','irr_surface','irr_gradient','projection']:
                 continue
             try:
                 setattr(opsin,k,v)
             except KeyError, LookupError:
-                print 'Could not update for %s in opsin %s'%(k,opsintype)
+                logging.warning('Could not update for %s in opsin %s'%(k,opsintype))
                 
+        try: # see if we need to effective_illumination at each depth
+            projection = opsindict['projection']
+            if projection is not None and cell is not None and idx is not None:
+                if projection == 'z':
+                    mid_depth = cell.zmid[idx] 
+                    top_depth = cell.zmid.max()
+                elif projection == 'y':
+                    mid_depth = cell.ymid[idx] 
+                    top_depth = cell.ymid.max()
+                elif projection == 'x':
+                    mid_depth = cell.xmid[idx]
+                    top_depth = cell.xmid.max()
+                else:
+                    print(" projection not specified")
+            
+            effective_illumination = opsindict['irr_surface'] - opsindict['irr_gradient']*(top_depth-mid_depth)
+            if effective_illumination <0:
+                effective_illumination = 0
+            logging.debug("depth debugging: %g %g %g"%( mid_depth, (top_depth-mid_depth), effective_illumination))
+            opsin.irradiance = effective_illumination*opsindict['irradiance']
+            
+        except:
+            logging.info('!! Required information missing for calculating effective_illumination')
+            logging.info("!! Required fields for opdict = projection, irr_gradient, irr_surface")
+  
         return opsin
         
-"""
-# written for when sectionlist was a SectionList    
-        
-    def express_opsin(self,cell,params):
-        expressed_op = {}
-        print '=============== About to start expressing opsins =================='
-        print 'We observe: ',params['opsindict']
-        for opsin in params['opsindict'].keys():
-            oplist = h.List()
-            print 'Expressing opsin %s --------------------'%opsin
-            for subdomain in params['opsindict'][opsin].keys():
-                print '- expressing %s in %s'%(opsin,subdomain)
-                total = 0
-                #get corresponding section list
-                sectionlist = cell.domainlists[subdomain]
-                for sec in sectionlist:
-                    #print sec.name()
-                    for (j,seg) in enumerate(sec):
-                        op = self._express_opsin_section(seg,sec,opsin,params['opsindict'][opsin][subdomain])
-                        oplist.append(op)
-                        total +=1
-                print 'Expressed opsin %s in %g segments in subdomain %s'%(opsin,total,subdomain)
-            print '... finished expressing opsin %s'%opsin
-            expressed_op[opsin] = oplist
-        print '=============== Finished expressing opsins =================='
-        return expressed_op
-    
-    
-
-    def _express_opsin_section(self,segment,section,opsintype,opsindict):
-        "" Expresses opsin in a specific segment ""
-
-        opsin = getattr(h,opsintype)()
-        opsin.loc(segment.x,sec=section)
-        opsin.gbar = opsindict['exp']*h.area(segment.x)
-                
-        for (k,v) in opsindict.iteritems():
-            if k=='exp':
-                continue
-            try:
-                setattr(opsin,k,v)
-            except KeyError, LookupError:
-                print 'Could not update for %s in opsin %s'%(k,opsintype)
-                
-        return opsin
-        
-"""    

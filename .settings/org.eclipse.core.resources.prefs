@@ -1,3 +1,6 @@
-#Thu Apr 18 17:31:18 BST 2013
 eclipse.preferences.version=1
-encoding/experiment_timing_offset.py=utf-8
+encoding//archive/run_contiguous_areas.py=utf-8
+encoding//archive/run_stimulation_old.py=utf-8
+encoding//diary/experiment_timing_offset.py=utf-8
+encoding//src/run_experiments.py=utf-8
+encoding//src/run_stimulation.py=utf-8

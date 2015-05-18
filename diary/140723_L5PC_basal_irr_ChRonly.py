@@ -31,7 +31,7 @@ iclamp_amps = np.arange(0.0,5.51,0.5)
 # In vivo parameters
 freqs = range(20,150,10)
 freqs = range(15,150,10) + [150]
-#freqs = range(15,151,5)
+freqs = range(2,15,2)+range(15,151,5)
 Js = [2.]
 nsite_range = [80]
 dist = [100,-1]
@@ -54,7 +54,10 @@ celltype = 'L5PC'
 #######################
 factors = [0.125,0.25,0.5,1.,2.,4.,8.]
 factors = [0.125,0.25,0.5,0.75,1.,1.5,2.] # for vitro
-factors = [0.125,0.25,0.5,0.75,1.] # for vivo
+factors = [0.001,0.125,0.25,0.5,0.75,1.] # for vivo
+#factors = [0.001]
+
+
 
 irrs = [0.01,0.02]
 irrs = [0.001,0.002]
@@ -426,7 +429,7 @@ def analyse_locations_optogen_invivo():
 def analyse_factors_invivo():
     
     
-    for irr in irrs:
+    for irr in [0.002]: #irrs:
         af = run_analysis.AnalyticFrame()
     
         af.update_params({'tstart':light_on,'tstop':light_on+light_dur,
@@ -443,9 +446,7 @@ def analyse_factors_invivo():
         
         af.populate_expset(expbase,expss,explabels, [freqs])
         
-        
         af.submenu_extractSpikes()
-        
         af.submenu_runFI()
         for exp in af.experimentset:
             exp.calculate_responses('FI')
@@ -455,11 +456,13 @@ def analyse_factors_invivo():
         af.submenu_save()
         af.submenu_print()
         
+        af.perform_analysis()
+        af._calculateModulationIndex()
         
         #af.submenu_plot(0, self.expbase+'FI_gain_irr%.2f_tree%s_varyFactor_exp%s%s_'%(0.05,tree,exp[0],exp[1]))
-        af.submenu_plot(5, expbase+'FI_gain_varyFactor_invivo_irr%g'%irr+'_NpHR_%s_ChR_%s'%(get_optdescript(irr,f)[1],get_optdescript(irr,f)[0]))
-        af.submenu_plot(0, expbase+'FI_gain_varyFactor_invivo_irr%g'%irr+'_NpHR_%s_ChR_%s'%(get_optdescript(irr,f)[1],get_optdescript(irr,f)[0]))
-        af.submenu_plot(10, expbase+'FI_gain_varyFactor_invivo_irr%g'%irr+'_NpHR_%s_ChR_%s'%(get_optdescript(irr,f)[1],get_optdescript(irr,f)[0]))
+        #af.submenu_plot(5, expbase+'FI_gain_varyFactor_invivo_irr%g'%irr+'_NpHR_%s_ChR_%s'%(get_optdescript(irr,f)[1],get_optdescript(irr,f)[0]))
+        #af.submenu_plot(0, expbase+'FI_gain_varyFactor_invivo_irr%g'%irr+'_NpHR_%s_ChR_%s'%(get_optdescript(irr,f)[1],get_optdescript(irr,f)[0]))
+        #af.submenu_plot(10, expbase+'FI_gain_varyFactor_invivo_irr%g'%irr+'_NpHR_%s_ChR_%s'%(get_optdescript(irr,f)[1],get_optdescript(irr,f)[0]))
        
         
     """

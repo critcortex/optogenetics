@@ -68,7 +68,7 @@ class NeuronExperiment:
         
     
     def get_default_params(self):
-        params = { 'tstart': 300,
+        params = { 'tstart': 0,
                    'tstop' : 1500,
                    'proxpt': 400,
                    'distpt': 620,
@@ -77,6 +77,14 @@ class NeuronExperiment:
                    'EPSP_transient':5,
                    'imax': 0.5}
         return params
+    
+    def _use_setup_params(self):
+        params = {'cell': ['Neuron','L5PC'],
+                  'cell_params':{},
+                  'tstart': 0,
+                  'tstop': 100,
+                  }
+        self.params = params
     
     def get_default_outputparams(self):
         outputparams = {}
@@ -328,10 +336,11 @@ class NeuronExperiment:
                 # DANGER WILL ROBINSON!
                 #string is a function call to select ... so 
                 print 'Got dynamic selection - ', ids[i]
-                print "cell.%s(%s)"%(ids[i][0],ids[i][1])
-                print self.cell
+                print "cell.%s(%s)"%(ids[i][0],ids[i][1]),
+                print self.cell,
                 #secid = getattr(self.cell,ids[i][0])(**ids[i][1])[0]
                 ids_list = getattr(self.cell,ids[i][0])(**ids[i][1])
+                print "... found %g elements"%len(ids_list)
                 random.shuffle(ids_list)
                 secid = ids_list[0]
                 print secid
@@ -385,6 +394,10 @@ class NeuronExperiment:
 
         
     def _create_iclamp(self,params):
+        """
+        Delivers an current injection using NEURON's IClamp object
+        
+        """
         print '\n'*3, 'iclamp = params = ', params
         tag_location = params['location']
         location =self.outputparams['tagged_locations'][tag_location][1]
@@ -398,13 +411,23 @@ class NeuronExperiment:
         self.outputparams['stim_iclamp'][tag_location] = iclamp
     
     def _create_iclamp_train(self,params):
+        """
+        Uses the IPulse3 to supply current to the neuron:
+        
+        From the IPulse3 documentation:
+            Generates a train of current pulses of variable amplitude
+            User specifies dur (pulse duration), per (period, i.e. interval 
+            between pulse onsets), and num (number of pulses).
+            Ensures that period is longer than pulse duration.
+        
+        """
         print '\n'*5, 'iclamp = params = ', params
         tag_location = params['location']
         
         location =self.outputparams['tagged_locations'][tag_location][1]
         position =self.outputparams['tagged_locations'][tag_location][2]
         clamptrain = {}
-        
+
         ipulse = h.Ipulse3()
         ipulse.loc(position,sec=location)
         ipulse.dur = params['dur']
@@ -477,11 +500,17 @@ class NeuronExperiment:
         Set up recording devices and structures.
 
         """
+        if self.params['record_loc'] is None or len(self.params['record_loc']) == 0:
+            print("No values/locations to record")
+            return        
+        
         #Record time
         self.rec_t = h.Vector()
         self.rec_t.record(h._ref_t)
         #print self.outputparams.keys()
         # Now go through and start recording voltage/current/etc
+        
+        
         for (recordable,locations) in self.params['record_loc'].iteritems():
             record_dict = {}
             for loc in locations:
@@ -697,24 +726,31 @@ class NeuronExperiment:
         return opsinvalue[0][0] is not None
         
         
-    def num_recording_areas(self,params,typerec):
-        return len(params['record_loc'][typerec])
+    def num_recording_areas(self,typerec):
+        print self.params.keys()
+        if self.params.has_key('record_loc'):
+        
+            if self.params['record_loc'] is not None and self.params['record_loc'].has_key(typerec):
+                return len(self.params['record_loc'][typerec])
+        
+        return 0
         
     def save_data(self):#,expname,savedata=False,opsindict={}):
         """
         
         """
         expname = self.params['expname']
-        if not self.params['savedata']:
+        if "savedata" not in self.params or not self.params['savedata']: 
+            print("Not saving data")
             return
         
         import numpy as np
         # save recorded voltages, currents, etc.
         
         #mat = np.matrix([self.rec_t])
-        mat = np.zeros((self.num_recording_areas(self.params,'v')+1,int(len(self.rec_t))))
+        mat = np.zeros((self.num_recording_areas('v')+1,int(len(self.rec_t))))
         mat[0,:] = self.rec_t
-        for i in range(self.num_recording_areas(self.params, 'v')):
+        for i in range(self.num_recording_areas('v')):
             mat[i+1,:] = self.outputparams['v_rec']['v_%s'%self.params['record_loc']['v'][i]]
         np.savetxt(expname+"_v.dat",mat)
         # TODO also save tag names as header info
@@ -831,8 +867,8 @@ class NeuronExperiment:
     def run_plots(self):
         lw = 2
         
-        if len(self.params['plot'].keys())==0:
-            print 'No plots to create'
+        if "plot" not in self.params or len(self.params['plot'].keys())==0:
+            print('No plots to create')
             return
         
         for figid in self.params['plot'].keys():
@@ -951,10 +987,24 @@ class NeuronExperiment:
             
     def save_outputfile(self):
         
-        self.outputparams['time_saved'] = time.strftime('%y/%m/%d:%H.%M')
-        for (k,v) in self.outputparams.iteritems():
-            print k, '-->',v
-        #fio.saveresults(self.outputparams, self.params['expname'])
+        if self.params['output']['output_pkl']:
+            self.outputparams['time_saved'] = time.strftime('%y/%m/%d:%H.%M')
+            for (k,v) in self.outputparams.iteritems():
+                print k, '-->',v
+            fio.saveresults(self.outputparams, self.params['expname'])
+            
+        if self.params['output'].has_key('neu'):
+            h.load_file("nrn/hoc/neu_tree.hoc")
+
+            try:
+                name = self.params['output']['neu']
+                if not name.endswith('.neu'):
+                    name = name+'.neu'
+                h.neu_tree(name)
+                print('Saved neuron to NEURON .hoc format : %s'%name)
+            except:
+                print('Error with trying to save supplied name')
+                h.neu_tree('%s.neu'%self.params['expname'])
         
 
     def print_stats(self):

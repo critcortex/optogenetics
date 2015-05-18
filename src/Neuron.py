@@ -5,18 +5,34 @@ import numpy as np
 import math
 from LFPy import Cell
 import collections
+from matplotlib.collections import LineCollection
+
+import logging
 
 
 class NeuronInterface(Cell):
+    """
+    
+    
+    Class data structures:
+        allseclist : type  = neuron.h.SectionList() [from LFPy/cell.py]
+        domainlists : type = dict [either in implemented interfaced]
+    
+    
+    """
     
     def __init__(self):
         """
         Create cell. Uses a whole bunch of methods from LFPy
         """
-        self._create_sectionlists()
         
+        self._create_sectionlists()
+        """
+        print('print allseclist --->')
         for sec in self.allseclist:
             print sec.name()
+        print('/allseclist')
+        """
         self.totnsegs = self._calc_totnsegs()
         self.verbose = True
         print "About to collect geometry"
@@ -26,19 +42,18 @@ class NeuronInterface(Cell):
         #self.populate_sectionlists()
         self.populate_subdomain_lists()
         
-        print '-----------------------------------'
+        """
         ss = self.domainlists['soma']
+        print ss
         for sec in ss.allsec():
-            print sec.name()
-        print '-----------------------------------'
-            
-        
-        #self.generate_seg_section()
+            pass #print sec.name()
+        """
+         
         try:
-            self.generate_seg_section()
-            
+            self.generate_seg_section()    
         except:
             print "Could not generate segment sections"
+    
     
     def get_cell(self):
         raise NotImplementedError( "Not implemented")
@@ -141,36 +156,53 @@ class NeuronInterface(Cell):
         """
         Automated way of populating domain/section lists
         """
-        self.domainlists = {}
+        # First, check whether self.domainlists has already been populated or not
+        # If it has, then we just leave the lists as is
+        # Note that we could use hasattr, but following Pythonic practice of asking forgiveness than asking 
+        # permission, we instead use try/except (see StackOverflow: qn 610883)
+        try:
+            
+            if self.domainlists is not None:
+                return
+        except AttributeError:
+            
+            # Else, go through and populate them:
+            # This method assumes that sections/segments are named in the format: 
+            #     l5pc.basal[1] 
+            #     stellate.dend0[45]
+            
+            self.domainlists = {}
+            for sec in self.allseclist:
+                name = sec.name()
+                domain_info = name.split('.')[-1].split('[')[0]
+                #print name, domain_info
+                if not self.domainlists.has_key(domain_info):
+                    print 'Added subdomain info for - ', domain_info
+                    self.domainlists[domain_info] = h.List()
+                #print '-: ', sec.name(), '-->', domain_info
+                self.domainlists[domain_info].append(sec)
         
-        for sec in self.allseclist:
-            name = sec.name()
-            domain_info = name.split('.')[-1].split('[')[0]
-            print name, domain_info
-            if not self.domainlists.has_key(domain_info):
-                print 'Added subdomain info for - ', domain_info
-                self.domainlists[domain_info] = h.List()
-            print '-: ', sec.name(), '-->', domain_info
-            self.domainlists[domain_info].append(sec)
-    
         
     def generate_seg_section(self):
-        #print 'generating segsection'
+        
         self.seg_sec = {}
         for subdom in self.get_subdomains():
-            #print 'subdom = ', subdom
             self.seg_sec[subdom] = {}
+            
             for idx in self.get_idx(subdom):
                 idxname = self.get_idx_name(int(idx))[1]
                 #print '--', idx, idxname
                 #print [(i,s) for (i,s) in enumerate(self.get_subdomain_list(subdom)) ]
                 sec = [(i,s) for (i,s) in enumerate(self.get_subdomain_list(subdom)) if s.name() == idxname]
-                #print sec
                 self.seg_sec[subdom][int(idx)] = (sec[0][0],sec[0][1], self.get_idx_name(int(idx))[2])
         #print self.seg_sec
     
-    def get_section_byname(self,sectioname,subdomain):
-        sec =  [(i,s) for (i,s) in enumerate(self.get_subdomain_list(subdomain)) if s.name() == sectioname]
+    def get_section_byname(self,sectioname,subdomain=None):
+        if subdomain is not None:
+            sec =  [(i,s) for (i,s) in enumerate(self.get_subdomain_list(subdomain)) if s.name() == sectioname]
+        else:
+            sec =  [(i,s) for (i,s) in enumerate(self.allseclist) if s.name() == sectioname]
+            
         if len(sec) == 0:
             return None
         else:
@@ -200,6 +232,7 @@ class NeuronInterface(Cell):
     def get_subdomain_list(self,name):
         #print 'get_subdomain_list: Was asked for name=',name
         #print 'type = ',self.domainlists[name].hname()
+        #print self.domainlists, name
         try:
             return self.domainlists[name]
         except:
@@ -214,8 +247,76 @@ class NeuronInterface(Cell):
         print 'Initialization of cell type not implemented. If segmentation faults exist, could be a reason why ... '
         
 
+    def get_idx_polygons_xy(self):
+        '''for each segment idx in celll create a polygon in the (x,z)-plane,
+        that can be visualized using plt.fill() or
+        mpl.collections.PolyCollection
+        
+        Returned argument is a list of (np.ndarray, np.ndarray) tuples
+        giving the trajectory of each section
+        
+        The most efficient way of using this would be something like
+        ::
+            from matplotlib.collections import PolyCollection
+            import matplotlib.pyplot as plt
+            
+            cell = LFPy.Cell(morphology='PATH/TO/MORPHOLOGY')
+            
+            zips = []
+            for x, z in cell.get_idx_polygons():
+                zips.append(zip(x, z))
+            
+            polycol = PolyCollection(zips,
+                                     edgecolors='none',
+                                     facecolors='gray')
+            
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            
+            ax.add_collection(polycol)
+            ax.axis(ax.axis('equal'))
+            
+            plt.show()
+        '''
+        polygons = []
+        for i in np.arange(self.totnsegs):
+            polygons.append(self._create_segment_polygon_xy(i))
+        
+        return polygons
 
-    
+    def _create_segment_polygon_xy(self,i):
+        '''create a polygon to fill for segment i'''        
+        x = [self.xstart[i], self.xend[i]]
+        y = [self.ystart[i], self.yend[i]]
+        d = self.diam[i]
+        
+        #calculate angles        
+        dx = np.diff(x)
+        dy = np.diff(y)
+        theta = np.arctan2(dy, dx)
+        
+        x = np.r_[x, x[::-1]]
+        y = np.r_[y, y[::-1]]
+                
+        #1st corner:
+        x[0] -= 0.5 * d * np.sin(theta)
+        y[0] += 0.5 * d * np.cos(theta)
+                
+        #end of section, first side
+        x[1] -= 0.5 * d * np.sin(theta)
+        y[1] += 0.5 * d * np.cos(theta)
+        
+        #other side
+        #end of section, second side
+        x[2] += 0.5 * d * np.sin(theta)
+        y[2] -= 0.5 * d * np.cos(theta)
+        
+        #last corner:
+        x[3] += 0.5 * d * np.sin(theta)
+        y[3] -= 0.5 * d * np.cos(theta)
+        
+        return x, y
+
 
     def dict_update(self,d, u):
         """
@@ -382,7 +483,7 @@ class L5PC(NeuronInterface):
         for subd in self.get_subdomains():
             self.domainlists[subd] = h.List() #h.SectionList()
         
-        print self.domainlists['soma'].hname()
+        #print self.domainlists['soma'].hname()
         
         for (i,sec) in enumerate(self.allseclist):
             try:               
@@ -484,28 +585,45 @@ class Section(nrn.Section):
         
         if name is not None:
             nrn.Section.__init__(self,name=name)
+            #self.name = name
+            #h.Section.__init__(self,name=name)
         else:
             nrn.Section.__init__(self)
+            #h.Section.__init__(self)
+        
+        print h.secname(sec=self), 
+        print ("--------")
         
         if startpt is not None and endpt is not None:
             self.startpt = startpt
             self.endpt = endpt
+            print "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<", startpt, endpt
             """
             SJ: Previously, I had neuron sections using pt3, but recently found that this
                 caused the NEURON ODE solver to break (don't ask). Here are remnants of my 
                 (unsuccessful) attempts to get it working again. 
             """
+            """
             # Attempt 1 
-            #h.pt3dclear(sec=self)
-            #self.push()
-            #h.pt3dadd(startpt[0],startpt[1],startpt[2],diam)
-            #h.pt3dadd(endpt[0],endpt[1],endpt[2],diam)
-            #h.pop_section()
+            h.pt3dclear(sec=self)
+            self.push()
+            h.pt3dadd(startpt[0],startpt[1],startpt[2],diam)
+            h.pt3dadd(endpt[0],endpt[1],endpt[2],diam)
+            h.pop_section()
+            """
+            """
+            
             # Attempt 2
-            #h.pt3dclear(sec=self)
-            #h.pt3dadd(startpt[0],startpt[1],startpt[2],diam,sec=self)
-            #h.pt3dadd(endpt[0],endpt[1],endpt[2],diam,sec=self)
+            h.pt3dclear(sec=self)
+            h.pt3dadd(startpt[0],startpt[1],startpt[2],diam,sec=self)
+            h.pt3dadd(endpt[0],endpt[1],endpt[2],diam,sec=self)
             #cellparams
+            """
+            """
+            # Attempt 3
+            h.pt3dadd(startpt[0],startpt[1],startpt[2],diam,sec=self)
+            h.pt3dadd(endpt[0],endpt[1],endpt[2],diam,sec=self)
+            """
         # set geometry
         self.L = L
         self.diam = diam
@@ -546,6 +664,8 @@ class Section(nrn.Section):
         self.spikecount.thresh = threshold
         self.spikecount.record(self.spiketimes)
 
+    def __str__(self):
+        return "Section: %s, d=%g"%(h.secname(sec=self), self.diam)
 
 
 class SimpleNeuron(NeuronInterface):
@@ -586,6 +706,7 @@ class SimpleNeuron(NeuronInterface):
         #pas = Mechanism('pas', {'e':-65,'g':0.0001})
         params = {'soma': {'L':10,
                            'diam':10,
+                           'nseg':1,
                            'Ra':150,
                            'name':'soma',
                            'startpt':[0,0,0],
@@ -621,6 +742,76 @@ class SimpleNeuron(NeuronInterface):
         for (key,val) in self.params.iteritems():
             if type(val) is dict and val.has_key('mechanisms'):
                 self.params[key]['mechanisms'] = [ self.mechanisms[mk] for mk in val['mechanisms']]
+        
+        
+        
+    def check_3d(self):
+        """
+        ss = self.get_section_byname('dend0_0','dend0')[0][1]
+        print type(ss)
+        print ss
+        print ss.endpt
+        
+        print ">>>>>>>>>>>>>>>>>>>>dfsdf>>>>>>>>>>>>>>>>>>>>>"
+        for sec in self.allseclist:
+            h.pt3dclear(sec=sec)
+            # get the Python version of the object
+            ss = self.get_section_byname(sec.name())[0][1]
+            startpt = ss.startpt
+            endpt = ss.endpt
+            diam = ss.diam
+            print sec.name(), startpt, endpt, diam
+            h.pt3dadd(startpt[0],startpt[1],startpt[2],diam)
+            h.pt3dadd(endpt[0],endpt[1],endpt[2],diam)
+        print ">>>>>>>>>>>>>>>>>>>>>sdfsdf>>>>>>>>>>>>>>>>>>>>"
+
+        """
+
+        print ">>>>>>>>>>>>>>>>>>>>y546dfgdfgdfg>>>>>>>>>>>>>>>>>>>>>"
+        for dom in self.get_subdomains():
+            print 'dom .... ' , dom
+            #if dom == 'soma':
+            #    continue
+            for sec in self.domainlists[dom]:
+                h.pt3dclear(sec=sec)
+                # get the Python version of the object
+                ss = self.get_section_byname(sec.name(),dom)[0][1]
+                startpt = ss.startpt
+                endpt = ss.endpt
+                diam = ss.diam
+                print sec.name(), startpt, endpt, diam
+                h.pt3dadd(startpt[0],startpt[1],startpt[2],diam,sec=sec)
+                h.pt3dadd(endpt[0],endpt[1],endpt[2],diam,sec=sec)
+        print ">>>>>>>>>>>>>>>>>>>>>dfgdfgdfg>>>>>>>>>>>>>>>>>>>>"
+
+
+        """
+        i = 0
+        #for sec in self.allseclist:
+        for sec in h.allsec():   
+            print ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>",sec
+            print sec.name() 
+            #sec = h.
+            n3d = int(h.n3d())
+            for i in range(0,n3d):
+                print '--- i: ' + str(i) + ' ---'
+                print 'x:  ' + str(h.x3d(i,sec=sec))
+                print 'y:  ' + str(h.y3d(i,sec=sec))
+                print 'z:  ' + str(h.z3d(i,sec=sec))
+    
+                
+                h.pt3dchange(n,
+                                self.x3d[i][n],
+                                self.y3d[i][n],
+                                self.z3d[i][n],
+                                self.diam3d[i][n])
+                
+            i += 1
+            #let NEURON know about the changes we just did:
+            h.define_shape()
+        
+        """
+        
         
 class SimpleBipolar(SimpleNeuron):
     
@@ -896,4 +1087,231 @@ class FractalNeuron(SimpleNeuron):
         
         
 
+class FractalNeuronRall(SimpleNeuron):
+    """
+    A fractal tree, with the added constraint that each daughter branch obeys
+    the 3/2 power law sum
+    
+    see Rall (19XX), Rall and Rinzel (1973, 1974)
+    """
+    
+    def get_default_params(self):
+        pp = super(FractalNeuronRall,self).get_default_params()
+        
+        params = {'defaultlevel': {'L':50.,
+                            'diam'  : 0.4,
+                            'nseg':  10,
+                            'Ra' : 150,
+                            'mechanisms':['pas']}}
+        #'mechanisms':{'pas': ('pas',{'e':-65,'g':0.0001})} }
+        pp = self.dict_update(pp,params)
+        pp['num_base']=1
+        pp['num_split']=2
+        pp['num_levels']=4
+        return pp
+    
+    
+    
+    def __init__(self,inparams={}):
+                
+        params = self.get_default_params()
+        print 'inparams ================== ',inparams
+        self.params = self.dict_update(params, inparams)
+        print 'used params ================== ',self.params
+        self.generate_membrane_mechanisms()
+        # sectionlists
+        self.domainlists = {}
+        # create soma and populate corresponding domainlist
+        self.soma = self.create_soma(params['soma'])
+        self.domainlists['soma'] = h.List()
+        self.domainlists['soma'].append(self.soma)
+        # create dendrites
+        dendnames = self.__create_fractal_dendrites(params['num_base'],params['num_split'],params['num_levels'])
+        # set subdomain names
+        self.subdomains = ['soma'] + dendnames
+        
+        super(FractalNeuronRall,self).__init__()
+        
+        
+        #self.draw_fractal_tree('%s_nb%g_ns%g_nl%g'%('131220_confirm_fractal_old',params['num_base'],params['num_split'],params['num_levels']))
+        
+        #try:
+        super(FractalNeuronRall,self).check_3d()
+        #except:
+        #    print("Attempted to fix 3d points")
+            
+        print "Created Fractal neuron"
+    
+        # 03/02/2014: note that this will only now work when pt3 is again included in each Section 
+        self.draw_fractal_tree('%s_nb%g_ns%g_nl%g'%('131220_confirm_fractal',params['num_base'],params['num_split'],params['num_levels']))
+        
+        
+               
+        
+    def __create_fractal_dendrites(self,num_base,num_split,num_levels):
+        
+        dendnames = []
+        if self.params.has_key('level0'):
+            pp = self.params['level0']
+        else:
+            pp = self.params['defaultlevel']
+        
+        basediam = pp['diam']
+        
+        #print num_base, '-----------------'
+        for i in range(num_base):
+            print '\n\n\n------------------ Base %g'%i
+            dn = 'dend%g'%i
+            #print 'creating ',dn
+            # create domainlist
+            self.domainlists[dn] = h.List()
+            # add to domainnames
+            dendnames.append(dn)
+            # create section
+            diam = basediam
+            
+            position,max_subtend_theta,theta = self._get_firstchild_fractal_position(i,num_base,pp['L'])
+            #print 'base_%g = '%i,position,theta
+            
+            pp['parent'] = self.soma
+            pp['startpt'] = [0,0,0]
+            pp['endpt'] = position
+            pp['name'] = dn
+            pp['diam'] = diam  # have to reset
+            
+            setattr(self,dn,Section(**pp))
+            # recursive step
+            thisbranch = getattr(self,dn)
+            self.domainlists[dn].append(thisbranch)
+            #print 'creating children'
+            self.__create_child_dendrite(thisbranch,0,num_levels,num_split,name=dn,theta_parent=max_subtend_theta,posn_parent=position,theta_relative=theta,diam_parent=diam)
+            
+        return dendnames
+        
+        
+        
+        
+    def __create_child_dendrite(self,parent_branch,parent_level,max_level,num_split,name,theta_parent,posn_parent,theta_relative,diam_parent):
+        #print('child_dendrite: ', parent_level, max_level)
+        if parent_level+1 >= max_level:
+            #print('oops, should stop here')
+            return 
+        #pp = self.params['level%g'%(parent_level+1)]
+        if self.params.has_key('level%g'%(parent_level+1)):
+            pp = self.params['level%g'%(parent_level+1)]
+        else:
+            pp = self.params['defaultlevel']
+        
+        # calculate the new diameter, so that it follows the 3/2 power law as described in Rall, etc.. 
+        # As all daughter branches have the same diam, we can calc it here
+        diam_child =  (diam_parent**1.5/num_split)**(2./3)
+        #print "diam ",diam_parent,"==>",pp['diam']
+        
+        for j in range(num_split):
+            nn = name+'_%g'%j 
+            #print '-'*(parent_level+1),'creating section ', parent_level+1, j, '----------------------',nn
+            # create section, with this branch as parent
+            
+            position,max_subtend_theta,theta = self._get_child_fractal_position(j,num_split,length=pp['L'],parent_theta_subtend=theta_parent,parent_position=posn_parent,theta_relative=theta_relative)
+            #print 'child_%s = '%nn,position,theta
+            
+            pp['parent'] = parent_branch
+            pp['startpt'] = posn_parent
+            pp['endpt'] = position
+            pp['name'] = nn
+            pp['diam'] = diam_child
+            
+            #print "diam for ",nn,"is ==>",pp['diam']
+            
+            dj =  Section(**pp)
+            # add to domain list
+            parent_family = name.split('_')[0]
+            self.domainlists[parent_family].append(dj)
+            # then do the fractal step
+            self.__create_child_dendrite(dj,parent_level+1,max_level,num_split,name=nn,theta_parent=max_subtend_theta,posn_parent=position,theta_relative=theta,diam_parent=diam_child)
+        
+    def _get_firstchild_fractal_position(self,i,num_siblings,length):
+        origin = np.zeros(3)
+        return self._get_fractal_position(i,num_siblings,parent_theta_subtend=2*math.pi,parent_position=origin,length=length,theta_relative=0,use_theta_offset=False)
+    
+    def _get_child_fractal_position(self,i,num_siblings,parent_theta_subtend,parent_position,length,theta_relative):
+        return self._get_fractal_position(i,num_siblings,parent_theta_subtend,parent_position,length,theta_relative)
+    
+    def _get_fractal_position(self,i,num_siblings,parent_theta_subtend,parent_position,length,theta_relative,use_theta_offset=True):
+        """
+        
+        """
+        #print 'in get_fractal_posn:'
+        # angle relative to origin. Important for grand+children of soma, as everything else is done relative to this
+        # note that if we're at first child, then parent_position = [0,0,0], which gives theta_relative = 0, which is fine.
+        #theta_relative = np.arctan2(parent_position[1],parent_position[0]) 
+        #print 10*' ','theta rel = ', theta_relative
+        #print 10*' ','parent theta = ', parent_theta_subtend
+        
+        # theta offset:  
+        #theta_offset = 0 # TODO give proper value. Should be max of 90, 
+        if use_theta_offset and num_siblings > 1:
+            theta_offset = parent_theta_subtend*0.5*(num_siblings-1)/num_siblings
+        else:
+            theta_offset = 0
+        #print 10*' ','theta_offset = ', theta_offset
+        angle = i*parent_theta_subtend/num_siblings + theta_relative - theta_offset
+        #angle = i*parent_theta_subtend/num_siblings + theta_relative + theta_offset
+        #print 10*' ','base angle = ', i*parent_theta_subtend/num_siblings
+        #print 10*' ','updated angle = ', angle
+        new_position = parent_position + np.array([np.cos(angle)*length, np.sin(angle)*length, 0.])
+        #print 10*' ','new position = ',new_position
+        max_subtend = parent_theta_subtend/(num_siblings+1)
+        return new_position,  max_subtend, angle
+        
+        
+    def get_subdomains(self):
+        return self.domainlists
+    
+    def populate_sectionlists(self):
+        # don't need to do anything as this performed while elements are being created
+        pass
+        
+    def draw_fractal_tree(self,savename):
+        
+        # 03/02/2014: currently doesnt work as our Sections don't support 3d
+        import matplotlib.pyplot as plt
+        
+        x,y,z,r = self._collect_pt3d()
+        
+        
+        print x[0]
+        print '---------------'
+        print y[0]
+        print '======================================='
+        
+        xs = x[0]
+        ys = y[0]
+        lines = []
+        for i in range(0,len(xs),2):
+            ll = [[xs[i],ys[i]],[xs[i+1],ys[i+1]]]
+            lines.append(ll)
+        print lines
+        print '======================================='
+        
+        zips = []
+        for (i,pt) in enumerate(x[0]):
+            zips.append([pt,y[0][i]])
+        print zips
+        zz = list(zip(x[0], y[0]))
+        print zz
+        polycol = LineCollection(lines) #, edgecolors='gray', linewidths=2, facecolors='gray', closed=False)
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        
+        ax.add_collection(polycol)
+        ax.scatter(x[0],y[0])
+        #for z in polys:
+        #    ax.plot(z[0])
+        ax.axis(ax.axis('equal'))
+        
+        fig.savefig('%s.png'%savename)
+       
+        
+        
 
