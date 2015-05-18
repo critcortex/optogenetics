@@ -1,0 +1,281 @@
+forall delete_section()
+/* -----------------------------------------------------
+    Layer V Cortical Pyramidal Cell
+
+    Based on Yu Yuguo ( May 1, 2008)
+----------------------------------------------------- */
+
+
+objref somatodendritic, dendritic
+
+
+
+
+// --------------------------------------------------
+//    Parameter Settings
+// --------------------------------------------------
+
+/* Global */
+  dt = 0.01
+  celsius   = 37
+  steps_per_ms = 1/dt
+  tstop = 100
+  v_init = -70
+
+/* Others */
+  delay = 2  // global delay for preparing
+  axonOnSoma=1
+
+/* Passive membrane */
+  ra        = 150  // decrease ad to decrease of soma vth variability, increase axon's vth variability
+  global_ra = ra
+  rm        = 30000   // g_pas=1/rm
+  c_m       = 0.5
+  cm_myelin = 0.02
+  g_pas_node = 0.02
+
+/* Active channels */
+  // Nav
+  Ena = 60
+  gna12_soma = 80
+  gna12_dend = 80
+  gna12_ais_max = 3200   // Nav1.2
+  gna16_ais_max = 3200   // Nav1.6
+  gna16_nakeaxon= 300
+  gna12_myelin=20       // Nav1.2 at myelins
+  gna16_node = 3200     // Nav1.6 at node
+
+  vhalf_na12 = -30
+  vhalf_na16 = -43
+  vhalf_na = -30
+
+  // Kv
+  Ek = -90
+  gkv_soma = 20
+  gkv_dend = 10
+  gkv_axon = 1000
+
+  // Km
+  gkm = .3
+  gkm_soma = gkm
+
+  // Kca
+  gkca = 3
+  gkca_soma = gkca
+
+  // Ca
+  Eca=140
+  gca = .3
+  gca_soma = gca
+
+
+
+
+// ------------------------------------------------
+//    Cell Geometry
+// ------------------------------------------------
+
+
+/* Clean up */
+  forall delete_section()
+
+/* Soma and Dendrites */
+  load_file("geom/hu_soma_dendrites.hoc")
+
+  // build a sectionlist for soma and dendrites
+  somatodendritic = new SectionList()
+  forall {
+    if (L/nseg>40) {
+      nseg = L/40 + 1
+    }    // make sure no segments exceed 40 uM length. Note, soma.nseg remains 10.
+    somatodendritic.append()  // soma and dendrites are all included
+  }
+
+
+  // build a sectionlist for dendrites only
+  dendritic = new SectionList()
+  forsec somatodendritic dendritic.append()
+  soma  dendritic.remove()     // remove soma for pure dendritic sectionlist
+
+/* Axon */
+  load_file ("geom/hu_axon.hoc")
+  create_axon()
+
+/* Spines */
+  aspiny = 0  // 0 for spiny
+  if (!aspiny) {
+    load_file ("geom/hu_spines.hoc")
+    add_spines(dendritic,spine_dens)
+  }
+
+    define_shape() // Define shape in pt3d
+
+  distance(0,axonOnSoma)  // set the point where axon seated on soma as the origin
+
+
+// ----------------------------------------------------
+//  Insert Density Mechanisms
+// ----------------------------------------------------
+
+/* ---------------------------------------------
+     Define the Density Mechanisms
+----------------------------------------------*/
+
+// --------------------------------------------
+//  Install Passive Properties
+// --------------------------------------------
+
+proc install_passive() {
+
+  // Forall
+  forall {
+    insert pas
+    Ra = ra
+    cm = c_m
+    g_pas = 1/rm
+    e_pas = v_init
+  }
+
+  soma.cm=1
+  // Exceptions along the myelinated axon
+  forsec "myelin" cm = cm_myelin
+  forsec "node" g_pas = g_pas_node
+}
+
+
+// --------------------------------------------
+//  Install Active Channels
+// --------------------------------------------
+
+proc  install_channels() {
+
+  /* Add all kinds of channels to all sections*/
+    forall {
+      insert na gbar_na=0
+      insert na12  gbar_na12=0
+      insert na16  gbar_na16=0
+      insert kv    gbar_kv=0
+      insert km    gbar_km=0
+      insert kca   gbar_kca=0
+      insert ca    gbar_ca=0
+     }
+
+    // Added by Hu
+    vshift_na12 = -35 - vhalf_na12 -10  // negative shift of input voltage, high threshold  -30mV
+    vshift_na16 = -35 - vhalf_na16 -10    // positive shift of input voltage, low threshold  -43mV
+    vshift_na = -35 - vhalf_na -10  // the same as Na12
+
+
+
+  /* Channel Constants */
+    forall if(ismembrane("k_ion")) ek = Ek
+    forall if(ismembrane("na_ion")) ena = Ena
+    forall if(ismembrane("ca_ion")) {
+      eca = Eca
+      ion_style("ca_ion",0,1,0,0,0)
+      vshift_ca = 0
+    }
+
+  /* Somatodendritic */
+    forsec somatodendritic {
+      gbar_na = gna12_dend    // 80
+      gbar_kv = gkv_dend        // 20
+      gbar_km  = gkm            // 0.3
+      gbar_kca = gkca           // 0.3
+      gbar_ca = gca             // 0.3
+      insert cad                // Internal calcium concentration mechanism only at somatodendritic region.
+    }
+    soma {
+      gbar_na=gna12_soma          // 80
+      gbar_kv = gkv_soma            // 20
+      gbar_km = gkm_soma            // 0.3
+      gbar_kca = gkca_soma          // 0.3
+      gbar_ca = gca_soma            // 0.3
+    }
+
+  /* hill -> ais[0] -> ... -> ais[9] */
+
+    // Nav 1.2   ( gna12_ais_max=3200, refer to "Nav% iseg.xls")
+    hill.gbar_na12= gna12_ais_max     		*	1	*	0.8
+    ais[0]. gbar_na12= gna12_ais_max      *	0.96	*	1
+    ais[1]. gbar_na12= gna12_ais_max  		*	0.9	*	1
+    ais[2]. gbar_na12= gna12_ais_max  		*	0.75	*	1
+    ais[3]. gbar_na12= gna12_ais_max  		*	0.55	*	0.95
+    ais[4]. gbar_na12= gna12_ais_max  		*	0.366985879	*	0.880142857
+    ais[5]. gbar_na12= gna12_ais_max  		*	0.2	*	0.75
+    ais[6]. gbar_na12= gna12_ais_max  		*	0.100330761	*	0.647857143
+    ais[7]. gbar_na12= gna12_ais_max  		*	0.011532125	*	0.520285714
+    ais[8]. gbar_na12= gna12_ais_max  		*	0	*	0.428571429
+    ais[9]. gbar_na12= gna12_ais_max  		*	0	*	0.342857143
+
+    // Nav 1.6  ( gna16_ais_max=3200, refer to "Nav% iseg.xls" )
+    hill.gbar_na16 = gna16_ais_max	    *	0	*	0.8
+    ais[0]. gbar_na16 = gna16_ais_max	*	0.04	*	1
+    ais[1]. gbar_na16 = gna16_ais_max	*	0.1	*	1
+    ais[2]. gbar_na16 = gna16_ais_max	*	0.25	*	1
+    ais[3]. gbar_na16 = gna16_ais_max	*	0.45	*	0.95
+    ais[4]. gbar_na16 = gna16_ais_max	*	0.633014121	*	0.880142857
+    ais[5]. gbar_na16 = gna16_ais_max	*	0.8	*	0.75
+    ais[6]. gbar_na16 = gna16_ais_max	*	0.899669239	*	0.647857143
+    ais[7]. gbar_na16 = gna16_ais_max	*	0.988467875	*	0.520285714
+    ais[8]. gbar_na16 = gna16_ais_max	*	1	*	0.428571429
+    ais[9]. gbar_na16 = gna16_ais_max	*	1	*	0.342857143
+
+    // Kv delayed rectifier channels  ( gkv_axon=1000 )
+    hill.gbar_kv = gkv_axon	*	0.1
+    ais[0]. gbar_kv = gkv_axon	*	0.2
+    ais[1]. gbar_kv = gkv_axon	*	0.3
+    ais[2]. gbar_kv = gkv_axon	*	0.4
+    ais[3]. gbar_kv = gkv_axon	*	0.5
+    ais[4]. gbar_kv = gkv_axon	*	0.6
+    ais[5]. gbar_kv = gkv_axon	*	0.7
+    ais[6]. gbar_kv = gkv_axon	*	0.8
+    ais[7]. gbar_kv = gkv_axon	*	0.9
+    ais[8]. gbar_kv = gkv_axon	*	1
+    ais[9]. gbar_kv = gkv_axon	*	1
+
+
+  /*  Nakeaxon */
+    nakeaxon  {
+      gbar_na16 = gna16_nakeaxon	    // 300, artificial (ought to be 1600)
+      gbar_na12 = 0
+      gbar_kv = 1500
+    }
+
+  /* ( Myelin[0] Node[0] ) -> ... -> ( Myelin[n_myelin] Node[n_myelin] )  */
+    forsec "myelin" gbar_na = gna12_myelin    // 20
+    forsec "node" gbar_na16 = gna16_ais_max/2  // 1600
+
+}
+
+proc  install_chanrhod() {
+        /* INSERT CHANNELRHODOPSIN-2 */
+
+    central_node = 7
+    soma {insert chanrhod}
+    forsec "dend" {insert chanrhod}
+    forsec "ais" {insert chanrhod}
+    hill {insert chanrhod}
+    nakeaxon {insert chanrhod}
+    forsec "myelin" {insert chanrhod}
+    forsec "node" {insert chanrhod}
+}
+
+// Install passive membrane properties
+install_passive()
+
+// Install active channels
+install_channels()
+
+// Install Channelrhodopsin
+install_chanrhod()
+
+
+/*  Recording and Graphing   */
+// Call the Recording Section
+//xopen("lib/P_Recording.hoc")
+// Call the Session "hu_full"
+//xopen ("session/P_full.ses")
+
+/* Inject soma, the oringinal one */
+//xopen("experiment/Pyramidal/inject_soma.hoc")

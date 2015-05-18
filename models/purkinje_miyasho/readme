@@ -1,0 +1,24 @@
+Miyasho T, Takagi H, Suzuki H, Watanabe S, Inoue M, Kudo Y, Miyakawa H (2001) 
+Low-threshold potassium channels and a low-threshold calcium channel regulate 
+Ca2+ spike firing in the dendrites of cerebellar Purkinje neurons: a modeling 
+study. 
+Brain Res 891:106-115 
+
+The mosinit.hoc file generates traces similar to figure 2 in the paper.
+It takes about 5 minutes to generate this figure on a 800 MHz Win 2000 PC.
+
+The model adopted De Schutter and Bower's model as the starting point, 
+then modified the descriptions of several ion channels, such as the P-type 
+Ca channel and the delayed rectifier K channel, and added class-E Ca 
+channels and D-type K channels to the model. Our new model reproduces most
+of our experimental results and supports the conclusions of our 
+experimental study that class-E Ca channels and D-type K channels are 
+present and functioning in the dendrites of Purkinje neurons.
+See above paper for more details and references.
+
+For more information on the model please contact Dr H. Miyakawa
+email address: miyakawa@ls.toyaku.ac.jp
+
+These model files were supplied by Dr. H. Miyakawa
+20120110 CalciumP.mod updated solve method to derivimplicit as per
+http://www.neuron.yale.edu/phpbb/viewtopic.php?f=28&t=592

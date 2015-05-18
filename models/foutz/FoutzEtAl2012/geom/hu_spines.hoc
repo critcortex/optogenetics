@@ -1,0 +1,23 @@
+    
+/* ---------------------------------------------------------------------------------------
+    Define the Spines Geometry
+    
+    Based on the "Folding factor" described in Jack et al (1989), Major et al (1994)
+    Note, this assumes active channels are present in spines at same density as dendrites
+------------------------------------------------------------------------------------------*/ 
+
+spine_dens = 1    // just using a simple spine density model due to lack of data on some neuron types.
+
+spine_area = 0.83 // um^2  -- K Harris
+
+proc add_spines() {  local a
+  forsec $o1 {
+    a =0
+    for(x) a=a+area(x)
+
+    F = (L*spine_area*spine_dens + a)/a
+
+    L = L * F^(2/3)
+    for(x) diam(x) = diam(x) * F^(1/3)
+  }
+}

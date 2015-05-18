@@ -1,0 +1,120 @@
+// main_example_epsps.hoc
+	strdef label_str
+	
+	//load_file("nrngui.hoc")
+	
+	print "--------------"
+
+	// open CA1 neuron model and set passive params
+	xopen("ca1.nrn")	
+	
+	for i = 0, nDend-1 {
+		d[i] {
+			cm = 1
+			insert pas
+			g_pas = 1/10000
+			e_pas = -65
+			v = -65
+			finitialize(v)
+		}
+	}
+	
+	s {
+		cm = 1
+		insert pas
+		g_pas = 1/10000
+		e_pas = -65
+		v = -65
+		finitialize(v)
+	}
+	
+	forall Ra = 70
+	
+	vRest = -65
+	tStop = 40
+	dt = .05
+	
+	s distance()
+	
+	// synapse object
+	objref s1
+	
+	num_of_synapses = 3
+		// set up plotting
+		objref g2[num_of_synapses]
+		
+	// below counter (cntr) moves synapse to different positions
+	// with different conductances
+	
+	for synapse_pos_cntr = 0,num_of_synapses-1 {
+	
+	if (synapse_pos_cntr == 0 ) {
+
+	//wopen("d38.out")
+	i = 38
+	gsyn = 1000e-6	
+	label_str="Proximal"
+	
+	} else if (synapse_pos_cntr ==1) {
+	
+	//wopen("d153.out")
+	i = 153
+//	gsyn = 1900e-6
+	gsyn = 1000e-6
+	label_str="Distal"
+	
+	} else if (synapse_pos_cntr ==2) {
+	
+	// open output file
+//	wopen("d268.out")
+	
+	// i is dendritic compartment for synapse
+//	i = 268
+	i = 153
+// 	gsyn = 3000e-6
+ 	gsyn = 2000e-6
+	label_str="Distal X2"
+	
+	}
+
+	g2[synapse_pos_cntr] = new Graph()
+	g2[synapse_pos_cntr].size(0, 20, -65,-64)
+	g2[synapse_pos_cntr].addvar("s.v(.5)",1,1)
+	g2[synapse_pos_cntr].exec_menu("Keep Lines")
+		
+	g2[synapse_pos_cntr].addvar("d[i].v(.5)",2,1)
+	d[i] {
+		
+				// place synapse on dendrite compartment d[i]
+				s1 = new AlphaSynapse(.5)
+				s1.gmax = gsyn
+				s1.onset = 0
+				s1.tau = 1
+	
+				// initialize simulation
+				t = 0
+				vp = vRest
+				forall {
+					v = vRest
+					finitialize(vRest)
+				}
+				// g2.erase()
+				g2[synapse_pos_cntr].begin()
+
+				// run simulation
+				while(t < tStop) {
+					fadvance()
+					g2[synapse_pos_cntr].plot(t)
+					// fprint("%g %g %g\n",t,s.v(.5),d[i].v(.5))
+				}
+				
+				g2[synapse_pos_cntr].flush()
+				doNotify()
+
+	}
+	g2[synapse_pos_cntr].label(label_str)
+//	g2[synapse_pos_cntr].exec_menu("View = plot")
+//	g2[synapse_pos_cntr].size(0, 40, -65.5, -54)
+	g2[synapse_pos_cntr].size(0, 40, -65, -64)
+}
+//	wopen()

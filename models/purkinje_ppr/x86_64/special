@@ -1,0 +1,13 @@
+#!/bin/sh
+if test "x${NRNHOME}" = "x" ; then
+	NRNHOME="/home/sjarvis1/code/nrn-7.2"
+fi
+if test "x${NRNBIN}" = "x" ; then
+	NRNBIN="/home/sjarvis1/code/nrn-7.2/x86_64/bin/"
+fi
+if test "" = "yes" ; then
+	NRNIV="${NRNBIN}nrniv.app/Contents/MacOS/nrniv"
+else
+	NRNIV="${NRNBIN}nrniv"
+fi
+"${NRNIV}" -dll "/home/sjarvis1/git/optogenetics/models/purkinje_ppr/x86_64/.libs/libnrnmech.so" "$@"

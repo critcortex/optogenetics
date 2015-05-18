@@ -1,0 +1,269 @@
+load_file("nrngui.hoc")
+cvode_active(1)
+
+dist=14
+rel=0.75
+
+nsyn=5
+weight=0.02
+
+Rm = 28000
+RmDend = Rm/2
+RmSoma = Rm
+RmAx = Rm
+
+Cm    = 1
+CmSoma= Cm
+CmAx  = Cm
+CmDend = Cm*2
+
+RaAll= 150
+RaSoma=150  
+RaAx = 50
+
+Vrest = -65
+dt = 0.01
+gna =  .03
+AXONM = 2
+gkdr = 0.005
+celsius = 35.0  
+KMULT =  0.022
+KMULTP = 0.022
+ghd=0.00005
+nash=10
+
+xopen("n160.nrn")             // geometry file
+
+access soma[5]
+distance()
+
+tstop=20
+
+objref g, b,c, stim, p, s[nsyn], rsyn[nsyn], nc[nsyn], rc, rd, rs
+objref rsynmda[nsyn], ncnmda[nsyn]
+
+b = new VBox()
+b.intercept(1)
+g = new Graph()
+g.size(0,tstop,-70,-10)
+g.family(1)
+g.addvar("apical[dist].v(rel)",2,2,2*tstop,0,2)
+g.xaxis(1)
+xpanel(" ",1)
+xbutton("current ", "runc()")
+xbutton("AMPA", "runa()")
+xbutton("AMPA+NMDA", "runm()")
+xpanel()
+b.intercept(0)
+b.map("gasparini et al.", 100,100,250,500)
+
+apical[dist] { 
+print distance(rel)
+stim= new IClamp(rel)
+stim.amp=0
+stim.dur=150
+stim.del=1
+	for i=0, nsyn-1 {
+		s[i] = new NetStims(rel)
+		s[i].interval=0
+		s[i].number = 1
+		s[i].start=1.e9
+		s[i].noise=0
+		rsynmda[i] = new nmdanet(rel)
+		rsyn[i] = new Exp2Syn(rel)
+		rsyn[i].e=0
+		rsyn[i].tau1 = .5
+		rsyn[i].tau2 = 1
+		nc[i] = new NetCon(s[i],rsyn[i],0,0,4.2e-3)
+                ncnmda[i] = new NetCon(s[i],rsynmda[i],0,0,1*0.0035)
+	}
+}
+
+axon[1] {
+                insert nax gbar_nax=gna * AXONM	sh_nax=3
+                insert kdr gkdrbar_kdr=gkdr
+                insert pas e_pas=Vrest g_pas = 1/RmAx Ra=RaAx cm=CmAx
+                insert kap gkabar_kap = KMULTP*0.2
+}
+
+axon[0] {   
+                insert nax  gbar_nax=gna * AXONM sh_nax=3
+                insert kdr  gkdrbar_kdr=gkdr 
+                insert pas e_pas=Vrest g_pas = 1/RmAx Ra=RaAx cm=CmAx
+                insert kap gkabar_kap = KMULTP*0.2
+}
+
+for i=0,NumSoma-1 soma[i] {   
+		insert hd ghdbar_hd=ghd	vhalfl_hd=-73
+                insert nas  gbar_nas=gna sh_nas=nash ar_nas=1
+                insert kdr gkdrbar_kdr=gkdr
+                insert kap gkabar_kap = KMULTP
+                insert pas e_pas=Vrest g_pas = 1/RmSoma Ra=RaSoma cm=CmSoma
+}
+
+
+for i=0,NumBasal-1 basal[i] {
+                insert nas gbar_nas=gna sh_nas=nash ar_nas=1
+                insert kdr gkdrbar_kdr=gkdr 
+                insert kap gkabar_kap=KMULTP
+                insert pas e_pas=Vrest g_pas = 1/RmDend Ra=RaAll cm=CmDend
+}
+                
+for i=0,NumApical-1 apical[i] {
+              insert pas e_pas=Vrest g_pas = 1/RmDend Ra=RaAll  cm=CmDend
+		insert hd ghdbar_hd=ghd
+                insert nas sh_nas=nash ar_nas=1	gbar_nas=gna
+                insert kdr gkdrbar_kdr=gkdr
+		insert kap
+		insert kad
+		gkabar_kap=0
+		gkabar_kad=0
+
+              for (x){ xdist = distance(x)
+                if (xdist>500) {xdist=500}
+                ghdbar_hd(x) = ghd*(1+3*xdist/100)
+                if (xdist > 100){
+			if (xdist>300) {ndist=300} else {ndist=xdist}
+			sh_nas=nash-8*(ndist-100)/200
+			vhalfl_hd(x)=-73-8*(ndist-100)/200
+                        gkabar_kad(x) = KMULT*(1+xdist/100)
+			gkabar_kap(x)=0
+                } else {
+			vhalfl_hd(x)=-73
+                        gkabar_kap(x) = KMULTP*(1+xdist/100)
+			gkabar_kad(x)=0
+                	}
+              				}
+				}
+
+
+proc init() {
+	t=0
+        forall {
+	v=Vrest
+        if (ismembrane("nas") || ismembrane("nax") ) {ena=55}
+        if (ismembrane("kdr") || ismembrane("kap") || ismembrane("kad")) {ek=-90}
+        if (ismembrane("hd") ) {ehd_hd=-30 }
+}
+	finitialize(v)
+        fcurrent()
+
+        forall {
+	for (x) {
+		e_pas(x)=v(x)
+		if (!ismembrane("hd")){e_pas(x)=e_pas(x)+(ina(x)+ik(x))/g_pas(x)}
+		if (ismembrane("hd")) {e_pas(x)=e_pas(x)+(ina(x)+ik(x)+i_hd(x))/g_pas(x)}
+}
+		}
+
+cvode.re_init()
+cvode.event(tstop)
+g.begin()
+g.plot(t)
+
+}
+
+proc advance() {
+	fadvance()
+	g.plot(t)
+	g.flush()
+	doNotify()
+}
+
+proc runm() {
+apical[dist] {
+for i=0, nsyn-1 {
+	rsyn[i] = new Exp2Syn(rel)
+	rsyn[i].e=0
+	rsyn[i].tau1 = .5
+	rsyn[i].tau2 = 1
+	nc[i] = new NetCon(s[i],rsyn[i],0,0,4.2e-3)
+	ncnmda[i].weight = 1*0.015
+	}
+}
+g.erase()
+g.color(1)
+g.label(0.5,0.8,"dt = .1")
+	for i=0, nsyn-1 {s[i].start=1+i*.1}
+run()
+
+g.color(2)
+g.label(0.5,0.75,"dt = 0.2")
+	for i=0, nsyn-1 {s[i].start=1+i*0.2}
+run()
+
+g.color(3)
+g.label(0.5,0.7,"dt = 0.5")
+	for i=0, nsyn-1 {s[i].start=1+i*0.5}
+run()
+
+g.color(4)
+g.label(0.5,0.65,"dt = 1")
+	for i=0, nsyn-1 {s[i].start=1+i*1}
+run()
+}
+
+proc runa() {
+apical[dist] {
+for i=0, nsyn-1 {
+	rsyn[i] = new Exp2Syn(rel)
+	rsyn[i].e=0
+	rsyn[i].tau1 = .5
+	rsyn[i].tau2 = 1
+	nc[i] = new NetCon(s[i],rsyn[i],0,0,5.2e-3)
+	ncnmda[i].weight = 0*0.015
+	}
+}
+g.erase()
+g.color(1)
+g.label(0.5,0.8,"dt = .1")
+	for i=0, nsyn-1 {s[i].start=1+i*.1}
+run()
+
+g.color(2)
+g.label(0.5,0.75,"dt = 0.2")
+	for i=0, nsyn-1 {s[i].start=1+i*0.2}
+run()
+
+g.color(3)
+g.label(0.5,0.7,"dt = 0.5")
+	for i=0, nsyn-1 {s[i].start=1+i*0.5}
+run()
+
+g.color(4)
+g.label(0.5,0.65,"dt = 1")
+	for i=0, nsyn-1 {s[i].start=1+i*1}
+run()
+}
+
+proc runc() {
+apical[dist] {
+for i=0, nsyn-1 {
+	rsyn[i] = new Exp2i(rel)
+	rsyn[i].tau1 = .5
+	rsyn[i].tau2 = 1
+	nc[i] = new NetCon(s[i],rsyn[i],0,0,.24)
+	ncnmda[i].weight = 0*0.015
+	}
+}
+g.erase()
+g.color(1)
+g.label(0.5,0.8,"dt = .1")
+	for i=0, nsyn-1 {s[i].start=1+i*.1}
+run()
+
+g.color(2)
+g.label(0.5,0.75,"dt = 0.2")
+	for i=0, nsyn-1 {s[i].start=1+i*0.2}
+run()
+
+g.color(3)
+g.label(0.5,0.7,"dt = 0.5")
+	for i=0, nsyn-1 {s[i].start=1+i*0.5}
+run()
+
+g.color(4)
+g.label(0.5,0.65,"dt = 1")
+	for i=0, nsyn-1 {s[i].start=1+i*1}
+run()
+}
