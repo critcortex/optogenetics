@@ -7,6 +7,8 @@ from LFPy import Cell
 import collections
 from matplotlib.collections import LineCollection
 
+import logging
+
 
 class NeuronInterface(Cell):
     """

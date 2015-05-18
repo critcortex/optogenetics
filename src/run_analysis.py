@@ -193,7 +193,7 @@ class AnalyticFrame:
     def submenu_plot(self,exptype=None,supplied_figname=None,**kwargs):
         print "Current plots available: ----------------------------------"
     
-        kk = ['FI','IClamp','IClamp_iPhoto','IClamp_iPhoto_peak','FI_compare','fit_FI','PSTH_population','population_raster','population_voltage','compare_features','fit_FI_bg',] 
+        kk = ['FI','IClamp','IClamp_iPhoto','IClamp_iPhoto_peak','FI_compare','fit_FI','PSTH_population','population_raster','population_voltage','compare_features','fit_FI_bg','compare_2D_FI'] 
         #TODO: get superset of keys for all exp.results
         for (i,k) in enumerate(kk):
             print '%g - %s'%(i,k)
@@ -475,6 +475,7 @@ class ExperimentPlotter:
         rcsettings = RC_SETTINGS[settings]
         pylab.rcParams.update(rcsettings)
         pylab.figure() 
+        print xs, len(xs), '<---------'
         intensities = np.linspace(0.1, 0.9, len(xs))
         m = cm.ScalarMappable(cmap=rcsettings['cmaps'][self.cmap_index])
         m.set_array(intensities)
@@ -617,7 +618,7 @@ class ExperimentPlotter:
                 print 'Error with plotting for expset', expset
                 print "Unexpected error:", sys.exc_info()[0]
                 continue
-            
+        print '--> ',obsxs, fitted
         # if we actually have something to plot
         if len(labels)>0:    
             self._plot_xs_ys(obsxs, obsys, fittedxs, fittedys, labels, xlabel, savefig, settings)
@@ -1057,7 +1058,67 @@ class ExperimentPlotter:
                 figname = '%s_%s_trait%s_%s.png'%(savefig,str(expset),t,time.strftime('%y%m%d'))
                 fig.savefig(figname)
                 print 'Saved figure as %s'%figname
+    
+    
+    
+    def plot_compare_2D_FI(self,experimentsets,savefig=None,settings='paper',axeslabels=[],axestitles=[],firing_rate='FI',plottitle=None):
+        """
+        Plot 2D histogram of firing rate (specified as FI) against two axes for two different traits
+        
+        #TODO set transparent for FI==0
+        #TODO set vmax to be mod 5
+        """
+        rcsettings = RC_SETTINGS[settings]
+        pylab.rcParams.update(rcsettings)
+        pylab.close('all')
+        
+        for (i,expset) in enumerate(experimentsets):
+
+            #get responses for 2D data set
+            data = np.array(expset.results[firing_rate])
+            print data
+            print expset.expvariables[0], expset.expvariables[1]
+            print len(data)
+            print len(expset.expvariables[0]), len(expset.expvariables[1])
+            print len(expset.expvariables[0]) * len(expset.expvariables[1])
+            data = data.reshape(len(expset.expvariables[0]),len(expset.expvariables[1]))
+            print data 
             
+            #plot dataset
+            pylab.close('all')
+            pylab.figure()#figsize=(5,5))
+            pylab.imshow(data,interpolation='nearest')
+            
+            ax = pylab.gca()
+            self.__turn_off_border(ax)
+            # axes labels and titles
+            ax.set_xlabel(axestitles[0])
+            ax.set_ylabel(axestitles[1])
+            ax.set_xticks(range(len(expset.expvariables[0])))
+            ax.set_yticks(range(len(expset.expvariables[1])))
+            if len(axeslabels)==0:
+                ax.set_xticklabels(expset.expvariables[0])
+                ax.set_yticklabels(expset.expvariables[1])
+            else:
+                ax.set_xticklabels(axeslabels[0])
+                ax.set_yticklabels(axeslabels[1])
+            
+            cb = pylab.colorbar()
+            cb.ax.set_ylabel('%s (Hz)'%firing_rate)
+            
+            if plottitle is not None:
+                pylab.title(plottitle)
+            
+            #save plot
+            if savefig is not None:
+                figname = '%s_%s_2DcompareFI_%s.png'%(expset,savefig,time.strftime('%y%m%d'))
+                pylab.savefig(figname,dpi=rcsettings['dpi'])
+                print 'Saved figure as %s'%figname
+            pylab.close('all')
+            
+        
+        
+    
     """   
         
     def _old_plot_fit_FI(self,experimentsets,savefig=None,settings='poster',polyfn='_poly',p0=None):
@@ -1279,7 +1340,7 @@ class ExperimentSet:
             self.expvariables = exp_params
         
         # Extended for the case where exp_params is lists of lists by using itertools.product 
-
+        print self.expvariables, '<---------------------'
         for v in list(itertools.product(*self.expvariables)):
             print v
             print self.subselect

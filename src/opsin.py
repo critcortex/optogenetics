@@ -1,5 +1,17 @@
 from neuron import h
-import logging
+import logging, sys
+
+#Bit of code for logging to stdout rather than to default log file
+#Taken from stackoverflow qn 14058453
+root = logging.getLogger()
+root.setLevel(logging.DEBUG)
+ch = logging.StreamHandler(sys.stdout)
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+root.addHandler(ch)
+# /logging
+
 
 class Opsin:
     """
@@ -76,6 +88,7 @@ class Opsin:
             cell
         
         """
+        print opsindict
     
         opsin = getattr(h,opsintype)()
         opsin.loc(segment.x,sec=section) 
@@ -90,19 +103,20 @@ class Opsin:
             except KeyError, LookupError:
                 logging.warning('Could not update for %s in opsin %s'%(k,opsintype))
                 
-              
         try: # see if we need to effective_illumination at each depth
             projection = opsindict['projection']
             if projection is not None and cell is not None and idx is not None:
-                if projection is 'z':
+                if projection == 'z':
                     mid_depth = cell.zmid[idx] 
                     top_depth = cell.zmid.max()
-                elif projection is 'y':
+                elif projection == 'y':
                     mid_depth = cell.ymid[idx] 
                     top_depth = cell.ymid.max()
-                elif projection is 'x':
+                elif projection == 'x':
                     mid_depth = cell.xmid[idx]
                     top_depth = cell.xmid.max()
+                else:
+                    print(" projection not specified")
             
             effective_illumination = opsindict['irr_surface'] - opsindict['irr_gradient']*(top_depth-mid_depth)
             if effective_illumination <0:
