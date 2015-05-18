@@ -29,8 +29,7 @@ import NeuroTools.stgen as ntst
 import numpy as np
 import run_stimulation
 
-import logging
-logging.basicConfig(level=logging.DEBUG)
+
 
 
 expbase = '150316_testirradianceDepth'
