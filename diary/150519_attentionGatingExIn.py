@@ -78,6 +78,35 @@ Jex = 0.1
 g = 3.0 # set to be the same as balanceEI 
 Jin = -g*Jex
 
+class AttentionGating():
+
+def get_populations(num_sites_ex,ratioEI):
+    num_sites_in = int(num_sites_ex*ratioEI)
+    num_sites_total = num_sites_ex + num_sites_in
+
+    ############ FOR Excitatory
+    num_ff = int(0.1*num_sites_ex) # which will all be in the apical dendrites
+    num_fb = int(0.1*num_sites_ex) # which will all be in the basal dendrites
+    num_rr = int(0.8*num_sites_ex) # which will be split between the apical and dendrites
+    # how we split our recurrent connections between apical and basal
+    rr_apic = int(0.5*num_rr)
+    rr_basal = num_rr - rr_apic
+    # so then the total number of synaptic sites on the apical and basal dendrites are:  
+    num_apic = num_ff + rr_apic
+    num_basal = num_fb + rr_basal
+    ############ FOR Inhibitory
+    i_num_ff = int(0.1*num_sites_in) # which will all be in the apical dendrites
+    i_num_fb = int(0.1*num_sites_in) # which will all be in the basal dendrites
+    i_num_rr = int(0.8*num_sites_in) # which will be split between the apical and dendrites
+    # how we split our recurrent connections between apical and basal
+    i_rr_apic = int(0.5*i_num_rr)
+    i_rr_basal = i_num_rr - i_rr_apic
+    # so then the total number of synaptic sites on the apical and basal dendrites are:  
+    i_num_apic = i_num_ff + i_rr_apic
+    i_num_basal = i_num_fb + i_rr_basal
+
+
+
 
 def get_spiketimes(rate,num_inputs):
     spikes = []
@@ -88,7 +117,7 @@ def get_spiketimes(rate,num_inputs):
     return spikes
 
 
-def _run_simulation(irr,factor,freq_ff,freq_rr,freq_fb,adist,bdist,Jex,Jin):
+def _run_simulation(irr,factor,freq_ff,freq_rr,freq_fb,adist,bdist,Jex,Jin,num_sites):
     """
     @params
         irr       irradiance
@@ -168,12 +197,13 @@ irr = 0.001
 factor = 0.6
 
 def runt():
-    for ffr in ff_rates[-2:]:
-        for rrr in scan_rates[-2:]:
-            for fbr in scan_rates[-2:]:
-                for J in [0.2]: #np.arange(0.1,0.51,0.1):
-                    _run_simulation(irr,factor,ffr,rrr,fbr,[100,-1],[100,-1],J,J*-g)
-                    return
+    for ffr in ff_rates:
+        for rrr in scan_rates:
+            for fbr in scan_rates:
+                for J in np.arange(0.1,0.51,0.1):
+		    for num_sites in range(100,801,100):
+                        _run_simulation(irr,factor,ffr,rrr,fbr,[100,-1],[100,-1],J,J*-g,num_sites)
+                        #return
                 
 
 runt()
