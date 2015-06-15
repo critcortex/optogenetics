@@ -18,5 +18,7 @@ for f in folders:
     
     
 # run nrnivmodl
-call(['nrnivmodl'])
+#call(['nrnivmodl'])
+call(['nrnivmodl nrn/mod/'])
+
 # will create executable folder

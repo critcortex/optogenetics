@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
+
 #import run_stimulation
 import run_stimulation
 import file_io as fio
@@ -11,8 +11,9 @@ from subprocess import call
 import numpy as np
 import collections
 from multiprocessing import Process, Queue, current_process, freeze_support
-
+"""
 import logging
+"""
 """
 #Bit of code for logging to stdout rather than to default log file
 #Taken from stackoverflow qn 14058453
@@ -24,7 +25,7 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 ch.setFormatter(formatter)
 root.addHandler(ch)
 # /logging
-
+"""
 
 OPSIN_EXP = 5e-4
 OPSIN_IRR = 10
