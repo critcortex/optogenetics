@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
 #import run_stimulation
 import run_stimulation
 import file_io as fio
@@ -24,7 +23,7 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 ch.setFormatter(formatter)
 root.addHandler(ch)
 # /logging
-
+"""
 
 OPSIN_EXP = 5e-4
 OPSIN_IRR = 10
@@ -275,8 +274,8 @@ class ExpSetup():
         
                     if expdict['logdata']:
                         fio.log_message('About to run an experiment name:%s\nParams:'%expname)
-                        for p in sorted(expdict.keys(),key=str.lower):
-                            fio.log_message("Param: %s = \t%s"%(p,expdict[p]),timenow=False)
+                        #for p in sorted(expdict.keys(),key=str.lower):
+                        #    fio.log_message("Param: %s = \t%s"%(p,expdict[p]),timenow=False)
                             
                     #print expdict['expname']
                     paramlist.append(copy.deepcopy(expdict))
@@ -287,8 +286,8 @@ class ExpSetup():
         
             if expdict['logdata']:
                 fio.log_message('About to run an experiment name:%s\nParams:'%expname)
-                for p in sorted(expdict.keys(),key=str.lower):
-                    fio.log_message("Param: %s = \t%s"%(p,expdict[p]),timenow=False)
+                #for p in sorted(expdict.keys(),key=str.lower):
+                #    fio.log_message("Param: %s = \t%s"%(p,expdict[p]),timenow=False)
                     
             paramlist.append(copy.deepcopy(expdict))
         

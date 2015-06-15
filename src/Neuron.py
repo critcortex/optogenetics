@@ -143,8 +143,21 @@ class NeuronInterface(Cell):
         return segments
     
     def convert_idx_secids(self,idx,sectionarea):
-        offset = self.get_idx(sectionarea)[0]
-        secids = [self.seg_sec[sectionarea][seg+offset] for seg in idx]
+        print('Convert idx -> secids')
+        if type(sectionarea)==list:
+            print "Method A"
+            print len(sectionarea)
+            print len(idx)
+            assert len(sectionarea)==len(idx)
+            secids = []
+            for (i,seg) in enumerate(idx):
+                offset = self.get_idx(sectionarea[i])[0]
+                secids.append(self.seg_sec[sectionarea[i]][seg+offset])
+        elif type(sectionarea)==str:
+            print "Method B"
+            # one individual section area, and all idx refer to that area
+            offset = self.get_idx(sectionarea)[0]
+            secids = [self.seg_sec[sectionarea][seg+offset] for seg in idx]
         return secids
     
     """

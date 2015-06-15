@@ -311,7 +311,8 @@ class NeuronExperiment:
         print 'we have find for', names, sections, ids
         
         for (i,name) in enumerate(names):
-            print '---------------------------------------',i #, ids[i]
+            print '---------------------------------------',i , type(ids[i])
+            
             if marked_loc.has_key(name):
                 # keep in for when we have excess for dictionary of idx
                 print 'Already has entry for ', name
@@ -319,13 +320,17 @@ class NeuronExperiment:
             if type(ids[i])==dict:
                 # take a bit more care with what we do next
                 if ids[i].has_key('idx'):
-                    
+                        
                         sublistnames,idxlist = ids[i]['idx']
-                        section_area = ids[i]['sections'][0]
-                        section_segments = self.cell.convert_idx_secids(idxlist,section_area)
+                        #section_area = ids[i]['sections'][0]
+                        section_segments = self.cell.convert_idx_secids(idxlist,ids[i]['sections'])
+                        print "has key idx"
+                        print "sublistnames ====> ",sublistnames
+                        print len(sublistnames)
+                        print len(ids[i]['sections'])
                         
                         for (tmp_id,sbname) in enumerate(sublistnames):
-                            marked_loc[sbname] = [section_area, section_segments[tmp_id][1], section_segments[tmp_id][2], section_segments[tmp_id][0]]
+                            marked_loc[sbname] = [ids[i]['sections'][tmp_id], section_segments[tmp_id][1], section_segments[tmp_id][2], section_segments[tmp_id][0]]
                 else:
                     print "Error: couldn't work out what kind of dictionary we had"
                         

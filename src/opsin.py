@@ -1,6 +1,6 @@
 from neuron import h
 import logging, sys
-
+"""
 #Bit of code for logging to stdout rather than to default log file
 #Taken from stackoverflow qn 14058453
 root = logging.getLogger()
@@ -11,7 +11,7 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 ch.setFormatter(formatter)
 root.addHandler(ch)
 # /logging
-
+"""
 
 class Opsin:
     """
@@ -36,17 +36,17 @@ class Opsin:
         
         """
         expressed_op = {}
-        logging.info('------ About to start expressing opsins ----------')
-        logging.info('We observe: ',params['opsindict'])
+        #logging.info('------ About to start expressing opsins ----------')
+        #logging.info('We observe: ',params['opsindict'])
         for opsin in params['opsindict'].keys():
             oplist = h.List()
-            logging.info('Expressing opsin %s --------------------'%opsin)
+            #logging.info('Expressing opsin %s --------------------'%opsin)
             for subdomain in params['opsindict'][opsin].keys():
-                logging.info('- expressing %s in %s'%(opsin,subdomain))
+                #logging.info('- expressing %s in %s'%(opsin,subdomain))
                 
                 # get the idx offset. This will only be used if setting unequal illumination
                 idx_offset = cell.get_idx(subdomain)[0]
-                logging.debug('_idx offset = %g'%idx_offset)
+                #logging.debug('_idx offset = %g'%idx_offset)
                 
                 total = 0  # total sections expressed so far
                 #get corresponding section list
@@ -60,10 +60,10 @@ class Opsin:
                         op = self._express_opsin_section(seg,sec,opsin,params['opsindict'][opsin][subdomain],idx_offset+total,cell)
                         oplist.append(op)
                         total +=1
-                logging.info('Expressed opsin %s in %g segments in subdomain %s'%(opsin,total,subdomain))
-            logging.info('... finished expressing opsin %s'%opsin)
+                #logging.info('Expressed opsin %s in %g segments in subdomain %s'%(opsin,total,subdomain))
+            #logging.info('... finished expressing opsin %s'%opsin)
             expressed_op[opsin] = oplist
-        logging.info('------ Finished expressing opsins ------')
+        #logging.info('------ Finished expressing opsins ------')
         return expressed_op
     
         
@@ -88,7 +88,7 @@ class Opsin:
             cell
         
         """
-        print opsindict
+        #print opsindict
     
         opsin = getattr(h,opsintype)()
         opsin.loc(segment.x,sec=section) 
@@ -101,7 +101,8 @@ class Opsin:
             try:
                 setattr(opsin,k,v)
             except KeyError, LookupError:
-                logging.warning('Could not update for %s in opsin %s'%(k,opsintype))
+                #logging.warning('Could not update for %s in opsin %s'%(k,opsintype))
+                pass
                 
         try: # see if we need to effective_illumination at each depth
             projection = opsindict['projection']
@@ -125,8 +126,9 @@ class Opsin:
             opsin.irradiance = effective_illumination*opsindict['irradiance']
             
         except:
-            logging.info('!! Required information missing for calculating effective_illumination')
-            logging.info("!! Required fields for opdict = projection, irr_gradient, irr_surface")
+            #logging.info('!! Required information missing for calculating effective_illumination')
+            #logging.info("!! Required fields for opdict = projection, irr_gradient, irr_surface")
+            pass
   
         return opsin
         

@@ -618,7 +618,7 @@ class ExperimentPlotter:
                 print 'Error with plotting for expset', expset
                 print "Unexpected error:", sys.exc_info()[0]
                 continue
-        print '--> ',obsxs, fitted
+        #print '--> ',obsxs, fitted
         # if we actually have something to plot
         if len(labels)>0:    
             self._plot_xs_ys(obsxs, obsys, fittedxs, fittedys, labels, xlabel, savefig, settings)
@@ -1456,9 +1456,12 @@ class ExperimentSet:
                     return
             tmp_results = []
             for exp in self.experiments:
-                #print 'looking up ',FUNCTION_LOOKUP[key]
-                tmp_v = getattr(exp, FUNCTION_LOOKUP[key])()
-                #print tmp_v, '-------------------------------------------------------'
+                print 'looking up ',FUNCTION_LOOKUP[key]
+                try:
+                    tmp_v = getattr(exp, FUNCTION_LOOKUP[key])(key)
+                except:
+                    tmp_v = getattr(exp, FUNCTION_LOOKUP[key])()
+                print tmp_v, '-------------------------------------------------------'
                 tmp_results.append(tmp_v)
             self.results[key] = tmp_results
         #except:
@@ -1806,8 +1809,8 @@ class Experiment:
     def process_spiketimes(self,**params):
         
         
-        #try:
-        if True:
+        try:
+        #if True:
             print 'Am going to check if spike file exists ...'
             if self._check_spikefile_exists():
                 print 'File already exists'
@@ -1820,7 +1823,7 @@ class Experiment:
             # we want to have all spikes, not just the ones in our area of analysis
             self.save_spikes(spikes)
             return spikes
-        #except:
+        except:
             print "Unexpected error:", sys.exc_info()[0]
             #pass #
     

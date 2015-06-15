@@ -183,12 +183,15 @@ def get_logfile(expname):
     return '%s'%(expname)+'_expDescript.txt'
         
 
-def log_message(message,timenow=True,level='info'):
+def log_message(message,timenow=True,level='info',location="stdout"):
     #TODO make level dynamic
     timestr = ''
     if timenow:
         timestr = '[%s]'%time.strftime('%d/%m/%y %HH:%MM')
-    logging.info("%s %s"%(timestr,message))
+    if True: #location=='stdout':
+        print(message)
+    else:
+        logging.info("%s %s"%(timestr,message))
 
 #--------------------------------------------------------------------------------------
 def loadjob(filename):
