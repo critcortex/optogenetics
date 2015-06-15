@@ -25,6 +25,7 @@ in recurrent population -- which will in turn modulate this cell
 To consider:
 -- how many inputs for basal vs apic - correct for 
 
+--- TODO: move to include inhibitory inputs (10% of each)
 
 """
 
