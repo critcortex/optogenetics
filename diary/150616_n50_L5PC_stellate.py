@@ -204,7 +204,7 @@ class ExpStellate():
                                 vplots_soma = [['mysoma','v','k']]
                     
                                 #iplots_soma = [['mysoma','ina','g'],['mysoma','ik','b']]
-                                pp['plot'] = {1:vplots_soma} 
+                                #pp['plot'] = {1:vplots_soma} 
                                     
                                 
                                 pp['num_threads'] = 1
