@@ -340,7 +340,7 @@ def runt():
                     # check files exist for ff, rr, and fb rates
                     hh.checkSpikeFile(fbr,MAX_SITES,spikefile)
                     
-                    for J in np.arange(0.1,0.31,0.1):
+                    for J in np.arange(0.1,0.21,0.1):
                         EG._run_simulation(irr,factor,ffr,rrr,fbr,[100,-1],[100,-1],J,J*-g,hh,shuffle_id)
                         count += 1
                         #return
