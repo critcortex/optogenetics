@@ -91,12 +91,14 @@ class AnalyticFrame:
             
         print len(expbases),expbases
         print len(expsubselects), expsubselects
-        
+        print len(explabels), explabels
         
         for (i,expss) in enumerate(expsubselects):
+
             ee = ExperimentSet(expbases[i],expss,explabels[i])
             ee.populate_experiments(exp_mainparams,self.analysis_params)
             print 'Created experiment set for : ',expbases[i], ' ',expsubselects[i]
+            
             self.experimentset.append(ee)
             # TODO: correct following line so that it works with list of basenames
             #print 'Current expbases: ',[str(exp) for exp in self.experimentset]
@@ -588,6 +590,7 @@ class ExperimentPlotter:
         labels = []
         
         for expset in experimentsets:
+            
             #if True:
             try:
                 ys = expset.get_property(yval_key)
@@ -602,17 +605,24 @@ class ExperimentPlotter:
                     xvals = xs
                     
                 xs,ys = self._sort_xsys(xs, ys)
+                # OLD
                 svals = np.asarray(xvals).ravel() 
+                # NEW
+                #svals = np.asarray(xs).ravel() 
                 fis = np.asarray(ys).ravel()
-                print fis
+                print "---------------------"
+                print xs,ys
+                print "---------------------"
                 
                 fitted_xvals = np.linspace(xs[0], xs[-1],num=len(xs)*4) # add more data points
                 fitted_svals = np.asarray(fitted_xvals).ravel() 
                 
                 poly,popt_curve,pname = self._fit_curve(svals, fis,p0, polyfn)
                 fitted = poly(fitted_svals,popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3])
-                
+                # OLD
                 obsxs.append(xvals)
+                # NEW
+                #obsxs.append(svals)
                 obsys.append(fis)
                 fittedxs.append(fitted_svals)
                 fittedys.append(fitted)
@@ -621,9 +631,13 @@ class ExperimentPlotter:
             except:
                 print 'Error with plotting for expset', expset
                 print "Unexpected error:", sys.exc_info()[0]
-                continue
+                #continue
         #print '--> ',obsxs, fitted
         # if we actually have something to plot
+        print "-=-=-=-=-=-"
+        print obsxs
+        print obsys
+        print "-=-=-=-=-=-"
         if len(labels)>0:    
             self._plot_xs_ys(obsxs, obsys, fittedxs, fittedys, labels, xlabel, savefig, settings)
             
@@ -1287,6 +1301,8 @@ class ExperimentPlotter:
     """    
         
 
+
+
 class ExperimentSet:
 
     def __init__(self,basename,subselect,label='no_label'):
@@ -1303,7 +1319,7 @@ class ExperimentSet:
         self.subselect = subselect
         self.label = label
         self.expvariables = []
-        self.results = {} #TODO : get rid of this
+        self.results = {} 
         self.experiments = []
     
     def __str__(self):
@@ -1345,11 +1361,18 @@ class ExperimentSet:
         
         # Extended for the case where exp_params is lists of lists by using itertools.product 
         print self.expvariables, '<---------------------'
-        for v in list(itertools.product(*self.expvariables)):
-            print v
-            print self.subselect
-            print self.subselect%v
-            self.experiments.append(Experiment(self.basename ,self.subselect%v,analysis_params,vals=v))
+        try:
+            for v in list(itertools.product(*self.expvariables)):
+                print v
+                print self.subselect
+                print self.subselect%v
+                self.experiments.append(Experiment(self.basename ,self.subselect%v,analysis_params,vals=v))
+        except:
+            for v in list(itertools.product(self.expvariables)):
+                print v
+                print self.subselect
+                print self.subselect%v
+                self.experiments.append(Experiment(self.basename ,self.subselect%v,analysis_params,vals=v))
     
     def save_experiments(self):
         print 'Saving ExperimentSet', self.label
@@ -1359,7 +1382,10 @@ class ExperimentSet:
     def load_experiments(self):
         print 'Loading ExperimentSet', self.label
         for exp in self.experiments:
-            exp.load_results()        
+            # will fail if doesn't get results for one experiment ->
+            #TODO: implement more robust method
+            exp.load_results()
+            
             #once data is loaded, go through and repopulate self.
             for (k,v) in exp.results.iteritems():
                 print k, v
@@ -1367,13 +1393,7 @@ class ExperimentSet:
                     self.results[k].append(v)
                 except: #doesn't have key
                     self.results[k] = [v]
-        print self.results
-    #def set_experiments(self,key,analysis_params):
-        #for v in self.expvariables[key]:
-        #    print v
-        #    print self.basename , self.subselect%v
-        #    self.experiments.append(Experiment(self.basename ,self.subselect%v,analysis_params))
-    #    pass
+        
         
     def run_analysis(self,analysis_fns,recalc=False):
         print 'in expset = ', analysis_fns
@@ -1486,8 +1506,130 @@ class ExperimentSet:
         for (k,v) in self.results.iteritems():
             print ' '*indent, '%s = %s'%(k,v)
             
+class RangeTrials:
+    
+    def __init__(self,basenames,trialInstances,variables,trials,trialLabel,label='no_label',var_format="%g"):
+        print "0 trialLabels = ",trialLabel
+        self.expRange = []
+        for (i,instance) in enumerate(trialInstances):
+            if type(basenames) is list:
+                basename = basenames[i]
+            else:
+                basename = basenames
+            if type(trialLabel) is list:
+                    
+                testlabel = trialLabel[i]
+            else:
+                testlabel = "%s_%g"%(trialLabel,i)   
+            print "A trialLabels = ",trialLabel
+            self.expRange.append(TrialExperimentSet(basename,[instance],variables,trials,testlabel,label,var_format))
             
+    def load_experiments(self):
+        for tes in self.expRange:
+            tes.load_experiments()
+        
+    def collate_results(self):
+        for tes in self.expRange:
+            tes.collate_results()
+    
 
+class TrialExperimentSet:
+    
+    def __init__(self,basename,trialInstances,variables,trials,trialLabel,label='no_label',var_format="%g"):
+        self.experimentsets = [] 
+        print "B trialLabels = ",trialLabel
+        self.__createTrialset(basename, trialInstances,variables, trials, trialLabel, label,var_format)
+        self.results = {}
+        
+        
+    def __createTrialset(self,basename,trialInstances,variables,trials,trialLabel,labels,var_format):
+        print "C trialLabels = ",trialLabel
+        self.label = trialLabel
+        print labels, type(labels)
+        print self.label, "=-======"
+        for (i,instance) in enumerate(trialInstances):
+            print("instance = %s ------------------------------------------"%instance)
+            for (j,var) in enumerate(variables):
+
+                if type(labels) is list:
+                    
+                    label = labels[j]
+                else:
+                    label = "%s_%g"%(labels,j)   
+                print("instance --> "+instance%(var,"%g"))
+                expset = ExperimentSet(basename,instance%(var,"%g"),label=label)
+                expset.populate_experiments(trials, {})
+                self.experimentsets.append(expset)
+    
+    def get_label(self):
+        return self.label
+    
+    def load_experiments(self):
+        
+        print 'Loading TrialExperimentSet'
+        for expset in self.experimentsets:
+            
+            expset.load_experiments()
+            print expset.results
+            #TODO: check that expset.label is not a reserved analysis type
+            self.results[expset.label] = expset.results
+
+        #print self.results
+    
+    def collate_results(self):
+        """
+        Use at your own risk! This method does NOT check that all results are present for 
+        all instances / trials; it instead just collates all instances so that 
+            label_freq10 : { 'FI': [10.5,11.,10.4]}
+            label_freq20 : { 'FI': [23.2,21.,24.2]}
+            --> 
+            {'FI' : [10.5,11.,10.4,23.2,21.,24.2] }
+        """
+        tmp_dict = []
+        for expset in self.experimentsets:
+            for restype in expset.results.keys():
+                if restype not in tmp_dict:
+                    tmp_dict.append(restype)
+        
+        for restype in tmp_dict:
+            self.results[restype] = []
+            for expset in self.experimentsets:
+                if self.results[expset.label].has_key(restype):
+                    self.results[restype] = self.results[restype]+self.results[expset.label][restype]
+                
+                
+                
+                
+        
+        
+    def calculate_average_responses(self):
+        avgs = ['FI','FI_bg','FI_post']
+        for expset in self.experimentsets:
+            for restype in expset.results.keys():
+                 
+                #TODO: implement
+                pass
+        
+    def get_property(self,key,index=None):
+        """
+        Catch for whether we don't know if it's a label or a dictionary label 
+        """
+        print self.results.keys()
+        # try results dictionary first
+        if self.results.has_key(key):
+            return self.results[key]
+        else: # it might be a class property
+            try:
+                if index is None:
+                    return getattr(self,key)
+                elif type(index) is int:
+                    return getattr(self,key)[index]
+            except:
+                print 'No property %s associated with this experiment'%key
+                return None
+        
+        #TODO: reimplement this, so that property for all trials is returned - and that should be enough
+        
 
 class Experiment:
     
