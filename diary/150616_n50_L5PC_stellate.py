@@ -110,11 +110,28 @@ class Helper():
         af.populate_expset(expname,expdescript,explabel, variables)
         #TODO: extract spikes
         if extractSpikes:
+            print "Trying to extract spikes ------"
             af.submenu_extractSpikes()
         # return AnalyticFrame for further plotting, etc.
         #af.submenu_save()
         return af
+    
+    def plot_trialSet(self,basenames,trialInstances,variables,trials,trialLabels,labels,var_format,exp_params={},extractSpikes=True):
+        """
         
+        
+        """
+        af = run_analysis.AnalyticFrame()
+        # set tstart,tstop for each experiment - technically don't have to do this, as the analysis has already been performed
+        af.update_params(exp_params)
+        # set up data structure for each experiment
+        af.populate_trialset(basenames, trialInstances, variables, trials, trialLabels, labels, var_format)
+        
+        if extractSpikes:
+            print "Trying to extract spikes ------"
+            af.submenu_extractSpikes()
+            
+        return af
  
 
 class ExpStellate():
@@ -169,7 +186,7 @@ class ExpStellate():
         ##' TEST PARAMS
         #self.factors = [0.5]
         #self.freqs = [60]
-        #self.irrs = [0.1,0.5,1.]
+        #self.irrs = [0.1,1.]
         self.ntrials =  5
         
     
@@ -371,26 +388,30 @@ class ExpStellate():
                               'tstart_bg': 50,'tstop_bg':self.light_on,
                               'tstart_post':self.light_on+self.light_dur,'tstop_post':self.tstop}
 
-        # analyse each trial
         for irr in self.irrs:
-            for trialtttt in range(1): #self.ntrials):
-                exp_descript = ['irr%.3f_'%irr+'factor%.2f_'%f+'freq%g'+'_J%g_trial%s'%(2.,'%g')+'_NpHR_%s_ChR_%s'%(description[1],description[0]) for trial in range(self.ntrials) for f in self.factors]
-                exp_labels = ['%.3f'%f for f in self.factors for t in range(self.ntrials)]
-                af = self.helper.plot_experiment(self.expbase,exp_descript,exp_labels,[self.freqs,range(self.ntrials)],expParams,extractSpikes=True);
-                af.submenu_runFI()
-                for exp in af.experimentset:
-                    exp.calculate_responses('FI')
-                    exp.calculate_responses('FI_bg')
-                    exp.calculate_responses('FI_post')
-                af.submenu_save()
-                af.submenu_print()
-                af.submenu_plot(10, 'test'+'FI_gain_irr%.1f_varyFactor_exp%s%s_'%(irr,description[0],description[1]))
-            # get all points for each factor
             
-        # push to AF
-        
-        
-        pass
+            instances = ["irr%.3f"%irr+"_factor%.2f"%factor+"_freq%g_J2_trial%s_NpHR_whole_ChR_whole" for factor in self.factors]
+            trials = range(self.ntrials)
+            trialLabels = ['%.2f'%f for f in self.factors]
+            labels = ["freq%g"%f for f in self.freqs]
+            var_format = '%g'
+
+            af = self.helper.plot_trialSet(self.expbase,instances,self.freqs,trials,trialLabels,labels,var_format,exp_params=expParams,extractSpikes=True)
+            
+            af.submenu_runFI()
+            for exp in af.experimentset:
+                exp.calculate_responses('FI')
+                exp.calculate_responses('FI_bg')
+                exp.calculate_responses('FI_post')
+            af.submenu_save()
+            af.submenu_print()
+            for exp in af.experimentset:
+                print exp
+                exp.load_experiments()
+                exp.collate_results()
+                print exp.results
+            af.submenu_plot(10, self.expbase+'FIbg_gain_irr%.3f_varyFactor_trialled_invivo_exp%s%s_'%(irr,description[0],description[1]))            
+            
     
     def analyse_invitro(self):
         pass
@@ -426,9 +447,10 @@ class ExpL5PC():
         
         
         ### DEBUG PARAMS
-        self.ntrials = 1
-        self.factors = [0.5]
-        self.freqs = [80]
+        self.ntrials = 5
+        #self.factors = [0.5]
+        #self.freqs = [80]
+        self.irrs = [0.002]
         
         
         
@@ -461,7 +483,7 @@ class ExpL5PC():
                                     pp['tstart'] = 0
                                     pp['tstop'] = self.tstop
                                     
-                                    print j, J, self.Ji
+                                    #print j, J, self.Ji
                                     Ji = self.Ji[j]
                                     
                                     mindist = dist[0]
@@ -469,12 +491,12 @@ class ExpL5PC():
                                     
                                     idx_a = self.helper._load_input_sites('shuffledSites_%s_apic_mindist%g_shuffle%g'%(self.cell[1],mindist,trial))[:nsites[0]]
                                     idx_b = self.helper._load_input_sites('shuffledSites_%s_dend_mindist%g_shuffle%g'%(self.cell[1],mindist,trial))[:nsites[1]]
-                                    print idx_a
-                                    print idx_b
+                                    #print idx_a
+                                    #print idx_b
                                     idx_ai = self.helper._load_input_sites('shuffledSites_%s_apic_mindist%g_shuffle%g'%(self.cell[1],mindist_i,trial))[:nsites[2]]
                                     idx_bi = self.helper._load_input_sites('shuffledSites_%s_dend_mindist%g_shuffle%g'%(self.cell[1],mindist_i,trial))[:nsites[3]]
-                                    print idx_ai
-                                    print idx_bi
+                                    #print idx_ai
+                                    #print idx_bi
                                     nsites_e = nsites[0]+nsites[2] #excitatory
                                     nsites_i = nsites[1]+nsites[3] #inhibitory
                                     nsites_a = nsites[0]+nsites[2] #apical
@@ -487,14 +509,10 @@ class ExpL5PC():
                                     
                                     #return
                                     idxzip = [otherbaseslabels,idx]
-                                    print idxzip
+                                    #print idxzip
                                     
 
                                     weights = np.concatenate((np.ones(nsites_e)*J,  np.ones(nsites_i)*self.Ji[j])) 
-                                    
-                                    
-                                    
-                                    
                                     
                                     pp['mark_loc'] = {}
                                     pp['mark_loc']['names'] = ['mysoma']+['dict']
@@ -510,19 +528,54 @@ class ExpL5PC():
                                     pp['spiketrains'] = [{'tstims': self.helper.get_spiketimes(freq,nsites_e+nsites_i,self.tstop), 'locations': otherbaseslabels, 'weights': weights,  'el': 0.1}]
                                         
                                     vplots_soma = [['mysoma','v','k']]
-                                    pp['plot'] = {1:vplots_soma} 
+                                    #pp['plot'] = {1:vplots_soma} 
                                     
                                     pp['num_threads'] = 1
                                                            
                                     pp.update({'expname':self.expbase,
                                                'description':'irr%.3f_factor%.2f_freq%g_J%g_Ji%g_nsites%g_%g_basal%g_%g_trial%g'%(irr,factor,freq,J,Ji,nsites[0],nsites[1],nsites[2],nsites[3],trial)})
                                     
-                                    #self.es.run_single_experiment(self.expbase, 'missing', pp)
+                                    self.es.run_single_experiment(self.expbase, 'missing', pp)
                                     count += 1
-                                    self.es.run_single_experiment(self.expbase, 'local', pp)
-                                    return 
+                                    #self.es.run_single_experiment(self.expbase, 'local', pp)
+                                    #return 
                                     
         print '%g jobs submitted'%count
+
+    def analyse_invivo(self):
+        description = ['whole','whole']
+        expParams = {'tstart':self.light_on,'tstop': self.light_on+self.light_dur,
+                              'tstart_bg': 50,'tstop_bg':self.light_on,
+                              'tstart_post':self.light_on+self.light_dur,'tstop_post':self.tstop}
+        J = self.Js[0]
+        Ji = self.Ji[0]
+        nsites = self.nsites[0]
+
+        for tt in range(1, self.ntrials+1):
+            for irr in self.irrs:
+                
+                instances = ["irr%.3f"%irr+"_factor%.2f"%factor+"_freq%g"+"_J%g_Ji%g_nsites%g_%g_basal%g_%g"%(J,Ji,nsites[0],nsites[1],nsites[2],nsites[3])+"_trial%s_NpHR_whole_ChR_whole" for factor in self.factors]
+                trials = range(tt)
+                trialLabels = ['%.2f'%f for f in self.factors]
+                labels = ["freq%g"%f for f in self.freqs]
+                var_format = '%g'
+    
+                af = self.helper.plot_trialSet(self.expbase,instances,self.freqs,trials,trialLabels,labels,var_format,exp_params=expParams,extractSpikes=True)
+                
+                af.submenu_runFI()
+                for exp in af.experimentset:
+                    exp.calculate_responses('FI')
+                    exp.calculate_responses('FI_bg')
+                    exp.calculate_responses('FI_post')
+                af.submenu_save()
+                af.submenu_print()
+                for exp in af.experimentset:
+                    exp.load_experiments()
+                    exp.collate_results()
+                af.submenu_print()    
+                af.submenu_plot(10, self.expbase+'FIbg_gain_irr%.3f_varyFactor_trialled%g_invivo_exp%s%s_'%(irr,tt,description[0],description[1]))            
+                af.submenu_plot(5, self.expbase+'FI_gain_irr%.3f_varyFactor_trialled%g_invivo_exp%s%s_'%(irr,tt,description[0],description[1]))            
+            
 
 
 """
