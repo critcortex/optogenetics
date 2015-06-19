@@ -574,6 +574,9 @@ class ExperimentPlotter:
         if savefig is not None:
             figname = '%sFIfit_%s.png'%(savefig,time.strftime('%y%m%d'))
             pylab.savefig(figname,dpi=rcsettings['dpi'])
+            print 'Saved figure as %s'%figname       
+            figname = '%sFIfit_%s.svg'%(savefig,time.strftime('%y%m%d'))
+            pylab.savefig(figname,dpi=rcsettings['dpi'])
             print 'Saved figure as %s'%figname        
         
     def get_derivative(self,fname):
