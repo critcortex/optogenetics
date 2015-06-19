@@ -32,7 +32,7 @@ EXP_IMG_LOCATION = 'experiments/%s/img/'
 EXP_PKL_LOCATION = 'experiments/%s/pkl/'
 EXP_GDF_LOCATION = 'experiments/%s/gdf/'
 
-CMAPS = ['jet','YlOrRd','YlGnBu_r','spectral','YlGnBu_r','YlOrRd','GnBu','jet']
+CMAPS = ['jet','YlOrRd','YlGnBu_r','spectral','YlGnBu_r','YlOrRd','GnBu','jet','CMAP_ORANGE_BLUE','CMAP_BLUE_ORANGE','CMAP_FULL_BLUE_ORANGE']
 
 OPSINS_IPHOTO = {'ChR': False, 
              'NpHR': True,
@@ -56,8 +56,6 @@ RC_SETTINGS = {'paper': {'lw': 3,
                           'colors':['r','b','k','g'],
                           'cmaps':CMAPS}}
 
-
-
 class AnalyticFrame:
     
     def __init__(self,cmap_index=0):
@@ -67,7 +65,7 @@ class AnalyticFrame:
         self.analysis_params = DEFAULT_ANALYSIS_SETTINGS
         
     def update_cmap(self,new_cmap_index):
-        self.expplotter.cmap_index = new_cmap_index
+        self.expplotter.update_cmap_index(new_cmap_index)
     
     def update_params(self,newparams):
         self.analysis_params.update(newparams)
@@ -78,6 +76,21 @@ class AnalyticFrame:
         ee = ExperimentSet(basename,expfilename)
         ee.experiments.append(Experiment(basename ,expfilename,self.analysis_params))
     """ 
+    def populate_trialset(self,basenames,trialInstances,variables,trials,trialLabels,label='no_label',var_format="%g"):
+ 
+        for (i,instance) in enumerate(trialInstances):
+            if type(basenames) is list:
+                basename = basenames[i]
+            else:
+                basename = basenames
+            if type(trialLabels) is list:
+                    
+                testlabel = trialLabels[i]
+            else:
+                testlabel = "%s_%g"%(trialLabels,i)   
+            
+            tes = TrialExperimentSet(basename,[instance],variables,trials,testlabel,label,var_format,self.analysis_params)
+            self.experimentset.append(tes)
 
     def populate_expset(self,basenames,expsubselects,explabels,exp_mainparams):
         
@@ -299,17 +312,67 @@ class ExperimentPlotter:
     
     def __init__(self,cmap_index=0):
         self.cmap_index = cmap_index
+        self.__update_cmap()
         
+    def update_cmap_index(self,new_cmap_index):
+        #try:
+        if True:
+            self.cmap_index = new_cmap_index
+            self.__update_cmap()
+        #except:
+        #    print("Couldn't change cmap -> leaving it unchanged")
+        
+    def __update_cmap(self,settings='paper'):
+        rcsettings = RC_SETTINGS[settings]
+        cmap = rcsettings['cmaps'][self.cmap_index]
+        print cmap, type(cmap)
+        if not cmap.startswith('CMAP'):
+            #cNorm = colors.Normalize(vmin=0,vmax=1) 
+            #self.cmap = colors.Colormap(rcsettings['cmaps'][self.cmap_index])
+            self.cmap = rcsettings['cmaps'][self.cmap_index]
+            print "---> ", self.cmap, type(self.cmap)
+        else:
+            self.cmap = self.load_cmap(rcsettings['cmaps'][self.cmap_index])
     
     def print_header(self,plottype,expset):
         print '='*40
         print 'Creating %s plot for expset = %s'%(plottype,str(expset))
         print '='*40
         
+    def load_cmap(self,filename):
+        """
+        Loads array from filename.txt -->
+        
+        Expects that each line is an R,G,B, value i.e.
+        
+        0,61,196,
+        6,73,198,
+        12,84,199,
+        18,95,200,
+        
+        
+        NOTE: If using a site to generate the colormap i.e. colormap.org , then use 
+            sed -i 's/;/,/g' FILENAME.txt
+            sed -i 's/]/,/g' FILENAME.txt
+            sed -i 's/[//g' FILENAME.txt
+              
+        to convert from 
+            [0,61,196;
+            6,73,198;
+            0,61,196;
+            6,73,198] into the desired format
+        
+        """
+        a = np.genfromtxt(filename+'.txt',delimiter=',')
+        a = a[:,:3]
+        cm = colors.ListedColormap(a/255)
+        return cm
+        
+    
     
     def __get_color(self,cmap,value=0.8):
         cNorm = colors.Normalize(vmin=0,vmax=1) 
-        scalarMap = cm.ScalarMappable(norm=cNorm, cmap=cmap)
+        scalarMap = cm.ScalarMappable(norm=cNorm, cmap=self.cmap)
         return scalarMap.to_rgba(value)
     
     def __turn_off_border(self,ax,turnoffs=['right','top']):
@@ -483,7 +546,9 @@ class ExperimentPlotter:
         pylab.figure() 
         print xs, len(xs), '<---------'
         intensities = np.linspace(0.1, 0.9, len(xs))
-        m = cm.ScalarMappable(cmap=rcsettings['cmaps'][self.cmap_index])
+        m = cm.ScalarMappable(cmap=self.cmap)#cmap=rcsettings['cmaps'][self.cmap_index])
+        #m = cm.ScalarMappable(cmap=rcsettings['cmaps'][self.cmap_index])
+        #m = cm.ScalarMappable(cmap=rcsettings['cmaps'][1])
         m.set_array(intensities)
         
         for (i,x) in enumerate(xs): 
@@ -598,7 +663,17 @@ class ExperimentPlotter:
                 if xval_key == 'expvariables':
                     # need to take the first expvariables value ... sigh. Such a good reminder to plan first, code second
                     # TODO : is there a better way to grab the xvals for this scenario
-                    xs = expset.get_property(xval_key,0)
+                    xitem = expset.get_property(xval_key)
+                    print xitem
+                    if type(xitem) is int or type(xitem) is float: 
+                        print "uhhuh - got an int/float"
+                    elif type(xitem[0]) is int or type(xitem[0]) is float:
+                        print "gotta list - good"
+                        xs = xitem
+                    else:
+                        xs = xitem[0]
+                    #xs = expset.get_property(xval_key,0)
+                    print xs
                     xvals = np.linspace(xs[0], xs[-1],num=len(xs)) 
                 else:
                     xs = expset.get_property(xval_key)
@@ -631,7 +706,7 @@ class ExperimentPlotter:
             except:
                 print 'Error with plotting for expset', expset
                 print "Unexpected error:", sys.exc_info()[0]
-                #continue
+                continue
         #print '--> ',obsxs, fitted
         # if we actually have something to plot
         print "-=-=-=-=-=-"
@@ -1489,7 +1564,7 @@ class ExperimentSet:
                 tmp_results.append(tmp_v)
             self.results[key] = tmp_results
         #except:
-            print "Could not calculate responses, unknown variable value = ", key
+        #    print "Could not calculate responses, unknown variable value = ", key
         #print 'Current results ',self.results
     
     def print_exps(self,indent=4):
@@ -1532,21 +1607,26 @@ class RangeTrials:
         for tes in self.expRange:
             tes.collate_results()
     
+    def calculate_responses(self,key,recalc=False):
+        for tes in self.expRange:
+            tes.calculate_responses(key,recalc=False)
 
 class TrialExperimentSet:
     
-    def __init__(self,basename,trialInstances,variables,trials,trialLabel,label='no_label',var_format="%g"):
+    def __init__(self,basename,trialInstances,variables,trials,trialLabel,label='no_label',var_format="%g",analysis_params={}):
         self.experimentsets = [] 
         print "B trialLabels = ",trialLabel
-        self.__createTrialset(basename, trialInstances,variables, trials, trialLabel, label,var_format)
+        self.__createTrialset(basename, trialInstances,variables, trials, trialLabel, label,var_format,analysis_params)
         self.results = {}
         
+
         
-    def __createTrialset(self,basename,trialInstances,variables,trials,trialLabel,labels,var_format):
+    def __createTrialset(self,basename,trialInstances,variables,trials,trialLabel,labels,var_format,analysis_params):
         print "C trialLabels = ",trialLabel
         self.label = trialLabel
         print labels, type(labels)
         print self.label, "=-======"
+        self.expvariables = variables
         for (i,instance) in enumerate(trialInstances):
             print("instance = %s ------------------------------------------"%instance)
             for (j,var) in enumerate(variables):
@@ -1558,11 +1638,16 @@ class TrialExperimentSet:
                     label = "%s_%g"%(labels,j)   
                 print("instance --> "+instance%(var,"%g"))
                 expset = ExperimentSet(basename,instance%(var,"%g"),label=label)
-                expset.populate_experiments(trials, {})
+                expset.populate_experiments(trials,analysis_params)
                 self.experimentsets.append(expset)
     
     def get_label(self):
         return self.label
+    
+    def save_experiments(self):
+        print 'Saving TrialExperimentSet', self.label
+        for exp in self.experimentsets:
+            exp.save_experiments()
     
     def load_experiments(self):
         
@@ -1575,6 +1660,11 @@ class TrialExperimentSet:
             self.results[expset.label] = expset.results
 
         #print self.results
+    
+    def calculate_responses(self,key,recalc=False):
+        for expset in self.experimentsets:
+            expset.calculate_responses(key,recalc=False)
+    
     
     def collate_results(self):
         """
@@ -1599,7 +1689,15 @@ class TrialExperimentSet:
                 
                 
                 
-                
+    def print_exps(self,indent=4):
+        for exp in self.experimentsets:
+            exp.print_exps(indent)
+            
+    
+    def print_data(self,indent=4):
+        for exp in self.experimentsets:
+            exp.print_data(indent)
+
         
         
     def calculate_average_responses(self):
@@ -1955,8 +2053,8 @@ class Experiment:
     def process_spiketimes(self,**params):
         
         
-        try:
-        #if True:
+        #try:
+        if True:
             print 'Am going to check if spike file exists ...'
             if self._check_spikefile_exists():
                 print 'File already exists'
@@ -1969,7 +2067,7 @@ class Experiment:
             # we want to have all spikes, not just the ones in our area of analysis
             self.save_spikes(spikes)
             return spikes
-        except:
+        #except:
             print "Unexpected error:", sys.exc_info()[0]
             #pass #
     
