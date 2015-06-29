@@ -32,7 +32,8 @@ EXP_IMG_LOCATION = 'experiments/%s/img/'
 EXP_PKL_LOCATION = 'experiments/%s/pkl/'
 EXP_GDF_LOCATION = 'experiments/%s/gdf/'
 
-CMAPS = ['jet','YlOrRd','YlGnBu_r','spectral','YlGnBu_r','YlOrRd','GnBu','jet','CMAP_ORANGE_BLUE','CMAP_BLUE_ORANGE','CMAP_FULL_BLUE_ORANGE']
+CMAPS = ['jet','YlOrRd','YlGnBu_r','spectral','YlGnBu_r','YlOrRd','GnBu','jet','CMAP_ORANGE_BLUE','CMAP_BLUE_ORANGE','CMAP_FULL_BLUE_ORANGE','r_pink','hot_r']
+
 
 OPSINS_IPHOTO = {'ChR': False, 
              'NpHR': True,
@@ -387,7 +388,7 @@ class ExperimentPlotter:
         ax.xaxis.set_ticks_position('bottom')
         ax.yaxis.set_ticks_position('left')
         
-    def plot_FI(self,experimentsets,savefig=None,settings='paper'):
+    def plot_FI(self,experimentsets,savefig=None,settings='paper',removeNulls=True):
         pylab.close('all')
         rcsettings = RC_SETTINGS[settings]
         print "-="*20,'cmapindex = ',self.cmap_index
@@ -400,7 +401,22 @@ class ExperimentPlotter:
                 print 'exp variables len', len(expset.expvariables[0])
                 print expset.expvariables[0]
                 print 'length FI', len(expset.results['FI'])
-                pylab.plot(expset.expvariables[0],expset.results['FI'],lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),label=expset.get_label())
+                if removeNulls:
+                    # find all instances where FI == 0 and remove corresponding expvariables and FI entries
+                    ys = expset.results['FI']
+                    xs = expset.expvariables[0]
+                    obs = np.nonzero(ys)[0][0]
+                    print type(ys), type(xs)
+                    print "---------------------------", obs, ys
+                    print "---------------------------", obs, xs
+                    print "---------------------------", obs
+                    print "---------------------------", obs
+                    print "---------------------------", obs
+                    print "---------------------------", obs
+                    print "---------------------------", obs
+                    pylab.plot(xs[obs:],ys[obs:],lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),label=expset.get_label())
+                else:
+                    pylab.plot(expset.expvariables[0],expset.results['FI'],lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),label=expset.get_label())
             except:
                 print 'Error with plotting for expset', expset
                 continue
@@ -451,6 +467,37 @@ class ExperimentPlotter:
 
     def _sigmoid_log(self,x,a,b,c,d):
         pass
+      
+    def _log_heaviside(self,x,a,b,c,p):
+        y = np.zeros(x.shape)
+        for i in range(len(y)):
+            y[i]=self._log_heaviside_inner(x[i],a,b,c,p)
+        return y  
+        
+        
+    def _log_heaviside_inner(self,x,a,b,c,p):
+        if x>p:
+            return a*np.log(b*x)+c
+        else:
+            return 0 
+        
+    def _power_law(self,x,a,b,c,d):
+        y = np.zeros(x.shape)
+        for i in range(len(y)):
+            #print "i ==", i, "x[i] --> ",x[i],
+            y[i]=self._power_law_inner(x[i],a,b,c,d)
+            if y[i]<0:
+                y[i] = 0 
+        return y  
+        
+        
+    def _power_law_inner(self,x,a,b,c,d):
+        #print "(x-a), and (x-a)**b ==> ", (x-a), (x-a)**b, 
+        if (x-a)>=0:
+            return c*(((x-a)**b)/(1+(x-a)**b)) ###-d
+        else:
+            return 0 
+        
 
     def _get_guesstimate(self,xvals,yvals,polyfn):
         
@@ -470,6 +517,16 @@ class ExperimentPlotter:
             print 'First nonzero at index',x0
             print xvals[x0]
             return [np.max(xvals),xvals[x0],0.,0.]
+        elif polyfn == '_log_heaviside': 
+            threshold = 0.1
+            xcrossing = np.where(yvals>threshold)[0][0]
+            return [1.,1.,1.,xvals[xcrossing]]
+        elif polyfn == '_power_law':
+            threshold = 0.1
+            xcrossing = np.where(yvals>threshold)[0][0]
+            return [xvals[xcrossing],1.,yvals[-1],0]
+        
+        
         else:
             return [1.,1.,1.,0.]
         
@@ -477,7 +534,7 @@ class ExperimentPlotter:
     def plot_fit_FI(self,experimentsets,savefig=None,settings='poster',polyfn='_poly'):
         
         pylab.close('all')
-        
+       
         self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_poly',polyfn='_poly',p0=[1.,1.,1.,0.])
         pylab.close('all')
         
@@ -488,10 +545,18 @@ class ExperimentPlotter:
         pylab.close('all')
        
         self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_log',polyfn='_log',p0=None)
-        print "Am in here"
         pylab.close('all')
         
-        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_mixed',polyfn=['_poly','_sigmoid','_linear','_log'],p0=None)
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_log_heaviside',polyfn='_log_heaviside',p0=None)
+        pylab.close('all')
+       
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_power_law',polyfn='_power_law',p0=None)
+        pylab.close('all')
+       
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_mixed',polyfn=['_poly','_sigmoid','_linear','_log','_log_heaviside','_power_law'],p0=None)
+        pylab.close('all')
+        
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_mixed2',polyfn=['_poly','_sigmoid','_linear','_log'],p0=None)
         pylab.close('all')
         
         
@@ -514,13 +579,19 @@ class ExperimentPlotter:
         pylab.close('all')
         
         self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_log',polyfn='_log',p0=None)
-        print "Am in here2"
         pylab.close('all')
         
-        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_mixed',polyfn=['_poly','_sigmoid','_linear','_log'],p0=None)
+        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_log_heaviside',polyfn='_log_heaviside',p0=None)
         pylab.close('all')
         
+        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_power_law',polyfn='_power_law',p0=None)
+        pylab.close('all')
         
+        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_mixed',polyfn=['_poly','_sigmoid','_linear','_log','_log_heaviside','_power_law'],p0=None)
+        pylab.close('all')
+        
+        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_mixed2',polyfn=['_poly','_sigmoid','_linear','_log'],p0=None)
+        pylab.close('all')        
         
         
     def _plot_fit_FI_bg(self,experimentsets,savefig=None,settings='poster',polyfn='_poly',p0=None):
@@ -561,8 +632,11 @@ class ExperimentPlotter:
         pylab.ylabel('Output frequency (Hz)')
         pylab.xlabel(xlabel)
         
-        pylab.ylim(ymin=-2)
-        pylab.xlim(xmin=-2)
+        
+        #pylab.ylim(ymin=ys[0]-np.abs(ys[0])*0.1)
+        #pylab.ylim(ymax=ys[-1]+np.abs(ys[-1])*0.1)
+        pylab.xlim(xmin=xs[0][0]-np.abs(xs[0][0])*0.1)
+        pylab.xlim(xmax=xs[0][-1]+np.abs(xs[0][-1])*0.1)
         
         cbarlabels = labels
         dc = intensities[1]-intensities[0]
@@ -583,13 +657,14 @@ class ExperimentPlotter:
         return getattr(self,'_d'+fname)
         
         
-    def _fit_curve(self,xs,ys,p0,polyfn):
+    def _fit_curve(self,xvals,yvals,p0,polyfn):
         """
         
         Returns:
             poly    function itself
             params   best fit params
             polyname name of function
+            xfitted  [xstart,xend] where start is where fitting started, and xend where fitting finished
         
         """
         max_interation = 10000
@@ -601,12 +676,41 @@ class ExperimentPlotter:
         best_poly_index = None
         for (p,pfn) in enumerate(poly):
             if p0 is None:
+                pguess = self._get_guesstimate(xvals,yvals,polyfn[p])
+            else:
+                pguess = p0
+                
+            # if poly is log_heaviside or power_law, then we have to remove
+            # datapoints (x_i, y_i) where y_i=0
+            #TODO:
+            if polyfn[p] == '_log_heaviside' or polyfn[p] == '_power_law':
+                #xs = xvals[yvals.nonzero()]
+                #ys = yvals[yvals.nonzero()]
+                xs = xvals[np.where(yvals>1)]
+                ys = yvals[np.where(yvals>1)]
+                print "we had ------------------------------"
+                print xvals
+                print yvals
+                
+                print "---- and we now have -----------------------------------------------------"
+                print xs
+                print ys
+            else:
+                xs = xvals
+                ys = yvals
+                
+            
+            if p0 is None:
                 pguess = self._get_guesstimate(xs,ys,polyfn[p])
             else:
                 pguess = p0
+               
+            
+                 
             if len(polyfn)>1:
-                # Calculate the RMSE using info from leastsq
+                # we're using a mix of functions
                 
+                # Calculate the RMSE using info from leastsq
                 try:
                     popt_params, pcov,infodict, errmsg, ier = curve_fit(pfn, xdata=xs, ydata=ys,p0=pguess,full_output=True,maxfev=max_interation)
                 except:
@@ -622,16 +726,22 @@ class ExperimentPlotter:
                     p_use = pguess
             else:
                 # if there's only one method to try .... 
-                print xs
+                print "so we have to fit :::::::::::::::::::::::::::::::::::::::::::"
+                print xs 
                 print ys
-                cparams,cpcov = curve_fit(pfn, xdata=xs, ydata=ys,p0=p0,maxfev=max_interation)
-                return pfn, cparams,polyfn[0]
+                print pguess
+                cparams,cpcov = curve_fit(pfn, xdata=xs, ydata=ys,p0=pguess,maxfev=max_interation)
+                print "and we found ::::::::::::::::::::::::::::::::::::::" 
+                print cparams
+                print "------------------------------------ Got to end of _fit_curve"
+                #return pfn, cparams,polyfn[0],[xs[0],xs[-1]]
+                return pfn, cparams,polyfn[0],[xvals[0],xvals[-1]]
             
         best_poly = poly[best_poly_index]
         cparams,cpcov = curve_fit(best_poly, xdata=xs, ydata=ys,p0=p_use,maxfev=max_interation)
         print "Best poly was %s with a RMSE = %g, params = "%(polyfn[best_poly_index],min_rmse), cparams
         
-        return best_poly, cparams, polyfn[best_poly_index]
+        return best_poly, cparams, polyfn[best_poly_index],[xvals[0],xvals[-1]]
         
 
     def _plot_fit_FI_general(self,experimentsets,xval_key,yval_key,xlabel,savefig=None,settings='poster',polyfn='_poly',p0=None):
@@ -686,17 +796,28 @@ class ExperimentPlotter:
                 # OLD
                 svals = np.asarray(xvals).ravel() 
                 # NEW
+                #TODO: change this to the correct - which wshould be xs
                 #svals = np.asarray(xs).ravel() 
                 fis = np.asarray(ys).ravel()
-                print "---------------------"
-                print xs,ys
-                print "---------------------"
                 
-                fitted_xvals = np.linspace(xs[0], xs[-1],num=len(xs)*4) # add more data points
+                
+                poly,popt_curve,pname,xfitted = self._fit_curve(svals, fis,p0, polyfn)
+                
+                upscale_factor = 4
+                #if polyfn == '_power_law':
+                #    upscale_factor = 4
+                print "Plotting fit from ", xfitted[0]
+                fitted_xvals = np.linspace(xfitted[0], xfitted[-1],num=len(xs)*upscale_factor) # add more data points
                 fitted_svals = np.asarray(fitted_xvals).ravel() 
                 
-                poly,popt_curve,pname = self._fit_curve(svals, fis,p0, polyfn)
                 fitted = poly(fitted_svals,popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3])
+                print "AAAA---------------------"
+                print xs
+                print ys
+                print popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3]
+                print "---------------------BBB"
+                
+                
                 # OLD
                 obsxs.append(xvals)
                 # NEW
@@ -707,6 +828,7 @@ class ExperimentPlotter:
                 labels.append(expset.get_label())
                 
             except:
+                # Usually a RuntimeError that the optimal parameters has not been found
                 print 'Error with plotting for expset', expset
                 print "Unexpected error:", sys.exc_info()[0]
                 continue
@@ -1183,7 +1305,7 @@ class ExperimentPlotter:
             #plot dataset
             pylab.close('all')
             pylab.figure()#figsize=(5,5))
-            pylab.imshow(data,interpolation='nearest')
+            pylab.imshow(data,interpolation='nearest',cmap=self.cmap)
             
             ax = pylab.gca()
             self.__turn_off_border(ax)
@@ -1207,7 +1329,7 @@ class ExperimentPlotter:
             
             #save plot
             if savefig is not None:
-                figname = '%s_%s_2DcompareFI_%s.png'%(expset,savefig,time.strftime('%y%m%d'))
+                figname = '%s_%s_2DcompareFI_%s.png'%(savefig,expset,time.strftime('%y%m%d'))
                 pylab.savefig(figname,dpi=rcsettings['dpi'])
                 print 'Saved figure as %s'%figname
             pylab.close('all')
