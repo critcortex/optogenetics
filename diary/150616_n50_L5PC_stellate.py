@@ -121,12 +121,13 @@ class Helper():
         
         
         """
+        print "test"
         af = run_analysis.AnalyticFrame()
         # set tstart,tstop for each experiment - technically don't have to do this, as the analysis has already been performed
         af.update_params(exp_params)
         # set up data structure for each experiment
         af.populate_trialset(basenames, trialInstances, variables, trials, trialLabels, labels, var_format)
-        
+        #return
         if extractSpikes:
             print "Trying to extract spikes ------"
             af.submenu_extractSpikes()
@@ -162,7 +163,7 @@ class ExpStellate():
         
         #iclamp_amps = np.arange(-1.0,1.7,0.2)
         #iclamp_amps = np.arange(1.8,3.1,0.2)
-        self.iclamp_amps = np.arange(-1.,3.1,0.2)
+        self.iclamp_amps = np.arange(-1.,3.5,0.1)
         #iclamp_amps = np.arange(5.,10.1,1.)
         
         #Js = np.arange(1.,5.)
@@ -209,23 +210,7 @@ class ExpStellate():
                                 # opsin
                                 chrdict =  {'exp':5e-4, 'irradiance' :irr, 'pulsewidth': self.light_dur,'lightdelay':self.light_on,'interpulse_interval':250,  'n_pulses':1}
                                 hrdict =  {'exp':5e-4, 'irradiance' :factor*irr, 'pulsewidth': self.light_dur,'lightdelay':self.light_on,'interpulse_interval':250,  'n_pulses':1}
-                                """
-                                pp['opsindict'] = {}
-                                if irr > 0 :
-                                    pp['opsindict']['ChR'] =  {'soma': chrdict,
-                                                               'dendrite':chrdict}
-                                    pp['ChR_areas'] = {'whole'      : pp['opsindict']['ChR'].keys()}
-                                else:
-                                    pp['ChR_areas'] = {'none'      : [None]}
-                                    
-                                if irr > 0 and factor > 0:
-                                    pp['opsindict']['NpHR'] =  {'soma': hrdict,
-                                                                'dendrite':hrdict}
-                                    pp['NpHR_areas'] = {'whole'      : pp['opsindict']['NpHR'].keys()}
-                                    
-                                else:
-                                    pp['NpHR_areas'] = {'none'      : [None]}
-                                """
+
                                 pp = self.helper.create_opsindict(irr, factor, chrdict, hrdict, pp, self.sections)
                                     
                                 # general settings 
@@ -314,21 +299,7 @@ class ExpStellate():
                         chrdict =  {'exp':5e-4, 'irradiance' :irr, 'pulsewidth': self.light_dur,'lightdelay':self.light_on,'interpulse_interval':250,  'n_pulses':1}
                         hrdict =  {'exp':5e-4, 'irradiance' :factor*irr, 'pulsewidth': self.light_dur,'lightdelay':self.light_on,'interpulse_interval':250,  'n_pulses':1}
                         
-                        pp['opsindict'] = {}
-                        if irr > 0 :
-                            pp['opsindict']['ChR'] =  {'soma': chrdict,
-                                                       'dendrite':chrdict}
-                            pp['ChR_areas'] = {'whole'      : pp['opsindict']['ChR'].keys()}
-                        else:
-                            pp['ChR_areas'] = {'none'      : [None]}
-                            
-                        if irr > 0 and factor > 0:
-                            pp['opsindict']['NpHR'] =  {'soma': hrdict,
-                                                        'dendrite':hrdict}
-                            pp['NpHR_areas'] = {'whole'      : pp['opsindict']['NpHR'].keys()}
-                            
-                        else:
-                            pp['NpHR_areas'] = {'none'      : [None]}
+                        pp = self.helper.create_opsindict(irr, factor, chrdict, hrdict, pp, self.sections)
                         
                         # general settings 
                         pp['experiment_type'] = 'opsinonly'
@@ -415,6 +386,24 @@ class ExpStellate():
     
     def analyse_invitro(self):
         pass
+        """
+        description = ['whole','whole']
+        expParams = {'tstart':self.light_on,'tstop': self.light_on+self.light_dur,
+                              'tstart_bg': 50,'tstop_bg':self.light_on,
+                              'tstart_post':self.light_on+self.light_dur,'tstop_post':self.tstop}
+
+        for irr in self.irrs:
+            
+            instances = ["irr%.3f"%irr+"_factor%.2f"%factor+"_I%.2f_"+"stimloc_%s"%+"_trial%g_NpHR_whole_ChR_whole" for factor in self.factors]
+            trials = range(self.ntrials)
+            trialLabels = ['%.2f'%f for f in self.factors]
+            labels = ["freq%g"%f for f in self.freqs]
+            var_format = '%g'
+
+            af = self.helper.plot_trialSet(self.expbase,instances,self.freqs,trials,trialLabels,labels,var_format,exp_params=expParams,extractSpikes=True)
+            
+            af.submenu_runFI()
+        """
 
 class ExpL5PC():
     
@@ -447,10 +436,11 @@ class ExpL5PC():
         
         
         ### DEBUG PARAMS
-        self.ntrials = 5
+        self.ntrials = 1
         #self.factors = [0.5]
         #self.freqs = [80]
         self.irrs = [0.002]
+        self.ttrials = 5
         
         
         
@@ -509,9 +499,7 @@ class ExpL5PC():
                                     
                                     #return
                                     idxzip = [otherbaseslabels,idx]
-                                    #print idxzip
-                                    
-
+                                
                                     weights = np.concatenate((np.ones(nsites_e)*J,  np.ones(nsites_i)*self.Ji[j])) 
                                     
                                     pp['mark_loc'] = {}
@@ -542,6 +530,96 @@ class ExpL5PC():
                                     
         print '%g jobs submitted'%count
 
+    def run_invivorep(self):
+        count = 0
+        for freq in self.freqs:
+            for factor in self.factors:
+                for irr in self.irrs: 
+                    for (j,J) in enumerate(self.Js):
+                        for nsites in self.nsites:
+                            for dist in self.mindist:
+                                for site_loc in range(self.ntrials):
+                                    
+                                
+                                    pp = {}
+                                    # neuron model and params
+                                    pp['cell'] = ['Neuron', 'L5PC']
+                                    pp['cell_params'] = {}
+                                    
+                                    # opsin
+                                    chrdict =  {'exp':5e-4, 'irradiance' :irr, 'pulsewidth': self.light_dur,'lightdelay':self.light_on,'interpulse_interval':250,  'n_pulses':1}
+                                    hrdict =  {'exp':5e-4, 'irradiance' :factor*irr, 'pulsewidth': self.light_dur,'lightdelay':self.light_on,'interpulse_interval':250,  'n_pulses':1}
+                                    
+                                    pp = self.helper.create_opsindict(irr, factor, chrdict, hrdict, pp, self.sections)
+                                    print pp
+                                        
+                                    # general settings 
+                                    pp['experiment_type'] = 'opsinonly'
+                                    pp['savedata'] = True 
+                                    
+                                    pp['tstart'] = 0
+                                    pp['tstop'] = self.tstop
+                                    
+                                    #print j, J, self.Ji
+                                    Ji = self.Ji[j]
+                                    
+                                    mindist = dist[0]
+                                    mindist_i = dist[1]
+                                    
+                                    idx_a = self.helper._load_input_sites('shuffledSites_%s_apic_mindist%g_shuffle%g'%(self.cell[1],mindist,site_loc))[:nsites[0]]
+                                    idx_b = self.helper._load_input_sites('shuffledSites_%s_dend_mindist%g_shuffle%g'%(self.cell[1],mindist,site_loc))[:nsites[1]]
+                                    #print idx_a
+                                    #print idx_b
+                                    idx_ai = self.helper._load_input_sites('shuffledSites_%s_apic_mindist%g_shuffle%g'%(self.cell[1],mindist_i,site_loc))[:nsites[2]]
+                                    idx_bi = self.helper._load_input_sites('shuffledSites_%s_dend_mindist%g_shuffle%g'%(self.cell[1],mindist_i,site_loc))[:nsites[3]]
+                                    #print idx_ai
+                                    #print idx_bi
+                                    nsites_e = nsites[0]+nsites[2] #excitatory
+                                    nsites_i = nsites[1]+nsites[3] #inhibitory
+                                    nsites_a = nsites[0]+nsites[2] #apical
+                                    nsites_b = nsites[1]+nsites[3] #basal
+                                     
+                                    
+                                    otherbaseslabels = ['apic_%g'%i for i in range(nsites[0])]+['apic_i%g'%i for i in range(nsites[2])]+['basal_%g'%i for i in range(nsites[1])]+['basal_i%g'%i for i in range(nsites[3])]
+                                    othersections = ['apic']*(nsites_a) + ['dend']*(nsites_b)
+                                    idx =  np.concatenate((idx_a,  idx_ai,  idx_b,  idx_bi)) 
+                                    
+                                    idxzip = [otherbaseslabels,idx]
+                                    
+                                    weights = np.concatenate((np.ones(nsites_e)*J,  np.ones(nsites_i)*self.Ji[j])) 
+                                    
+                                    pp['mark_loc'] = {}
+                                    pp['mark_loc']['names'] = ['mysoma']+['dict']
+                                    pp['mark_loc']['sections'] = ['soma']+['dict']
+                                    pp['mark_loc']['ids'] = [(0,0.5)] +  [{'idx':idxzip, 'sections':othersections}]
+                                    
+                                    pp['record_loc'] = {}
+                                    pp['record_loc']['v'] = ['mysoma'] #+labels
+                                    pp['record_loc']['ina'] = ['mysoma']
+                                    pp['record_loc']['ik'] = ['mysoma']
+                               
+                                    vplots_soma = [['mysoma','v','k']]
+                                    #pp['plot'] = {1:vplots_soma} 
+                                        
+                                    pp['num_threads'] = 1
+                                        
+                                    for time_trial in range(self.ttrials):
+                                        
+                                        pp['stim_spiketrains'] = True
+                                        pp['spiketrains'] = [{'tstims': self.helper.get_spiketimes(freq,nsites_e+nsites_i,self.tstop), 'locations': otherbaseslabels, 'weights': weights,  'el': 0.1}]
+                                                               
+                                        pp.update({'expname':self.expbase,
+                                                   'description':'irr%.3f_factor%.2f_freq%g_J%g_Ji%g_nsites%g_%g_basal%g_%g_sites%g_trial%g'%(irr,factor,freq,J,Ji,nsites[0],nsites[1],nsites[2],nsites[3],site_loc,time_trial)})
+                                        
+                                        self.es.run_single_experiment(self.expbase, 'missing', pp)
+                                        count += 1
+                                        #self.es.run_single_experiment(self.expbase, 'local', pp)
+                                        #return 
+                                    
+        print '%g jobs submitted'%count
+
+
+
     def analyse_invivo(self):
         description = ['whole','whole']
         expParams = {'tstart':self.light_on,'tstop': self.light_on+self.light_dur,
@@ -551,7 +629,7 @@ class ExpL5PC():
         Ji = self.Ji[0]
         nsites = self.nsites[0]
 
-        for tt in range(1, self.ntrials+1):
+        for tt in range(1, self.ntrials+1): # let's see how increasing n helps with identifying (or noisifying) the trend
             for irr in self.irrs:
                 
                 instances = ["irr%.3f"%irr+"_factor%.2f"%factor+"_freq%g"+"_J%g_Ji%g_nsites%g_%g_basal%g_%g"%(J,Ji,nsites[0],nsites[1],nsites[2],nsites[3])+"_trial%s_NpHR_whole_ChR_whole" for factor in self.factors]
@@ -575,9 +653,40 @@ class ExpL5PC():
                 af.submenu_print()    
                 af.submenu_plot(10, self.expbase+'FIbg_gain_irr%.3f_varyFactor_trialled%g_invivo_exp%s%s_'%(irr,tt,description[0],description[1]))            
                 af.submenu_plot(5, self.expbase+'FI_gain_irr%.3f_varyFactor_trialled%g_invivo_exp%s%s_'%(irr,tt,description[0],description[1]))            
-            
 
+    def analyse_invivorep(self):
+        description = ['whole','whole']
+        expParams = {'tstart':self.light_on,'tstop': self.light_on+self.light_dur,
+                              'tstart_bg': 50,'tstop_bg':self.light_on,
+                              'tstart_post':self.light_on+self.light_dur,'tstop_post':self.tstop}
+        J = self.Js[0]
+        Ji = self.Ji[0]
+        nsites = self.nsites[0]
 
+        for siteloc_index in range(self.ntrials+1):
+            for irr in self.irrs:
+                
+                instances = ["irr%.3f"%irr+"_factor%.2f"%factor+"_freq%g"+"_J%g_Ji%g_nsites%g_%g_basal%g_%g_sites%g"%(J,Ji,nsites[0],nsites[1],nsites[2],nsites[3],siteloc_index)+"_trial%s_NpHR_whole_ChR_whole" for factor in self.factors]
+                timetrials = range(self.ttrials)
+                trialLabels = ['%.2f'%f for f in self.factors]
+                labels = ["freq%g"%f for f in self.freqs]
+                var_format = '%g'
+    
+                af = self.helper.plot_trialSet(self.expbase,instances,self.freqs,timetrials,trialLabels,labels,var_format,exp_params=expParams,extractSpikes=True)
+                af.submenu_runFI()
+                for exp in af.experimentset:
+                    exp.calculate_responses('FI')
+                    exp.calculate_responses('FI_bg')
+                    exp.calculate_responses('FI_post')
+                af.submenu_save()
+                af.submenu_print()
+                for exp in af.experimentset:
+                    exp.load_experiments()
+                    exp.collate_results()
+                af.submenu_print()    
+                af.submenu_plot(10, self.expbase+'siterep_FIbg_gain_irr%.3f_varyFactor_trial%g_invivo_exp%s%s_'%(irr,siteloc_index,description[0],description[1]))            
+                af.submenu_plot(5, self.expbase+'siterep_FI_gain_irr%.3f_varyFactor_trial%g_invivo_exp%s%s_'%(irr,siteloc_index,description[0],description[1]))                        
+                
 """
 
 # Create sites for Stellate cells 

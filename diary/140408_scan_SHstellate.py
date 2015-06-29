@@ -66,6 +66,16 @@ dist_vitro = [304,305]
 #factors = [0]
 #iclamp_amps = [0]
 
+# MODS: 150622 - 
+irrs = [0.007]
+#iclamp_amps = np.arange(-1.,3.1,0.1)
+#iclamp_amps = np.arange(3.1,5.1,0.1)
+iclamp_amps = np.arange(-1.0,5.1,0.1)
+#iclamp_amps = [2.9]
+dist_vitro = [100.3,100.4]
+
+# /MODS
+
 def get_spiketimes(rate,num_inputs):
     spikes = []
     for i in range(num_inputs):
@@ -226,7 +236,7 @@ def scan_locations_optogen_invitro(loc):
                 if loc == 'soma':
                     stimloc = 'mysoma'
                 else:
-                    stimloc = labels[-1]
+                    stimloc = loc
                 pp['iclamp'] = [{'tstim':0,  'location': stimloc, 'amp':Ia, 'duration':tstop}]
                        
                 
@@ -402,6 +412,16 @@ def get_input_sites(self,mindist=150,shuffles=10):
         self._save_input_sites('sites_%s_mindist%g_shuffle%g'%(self.celltype,mindist,i),idx) 
     
 """
+def rename():
+    import shutil
+    # hack fnction
+    loc = "experiments/140408_scan_SHstell/dat/"
+    for i in np.arange(3.1,5.01,0.1):
+        for f in factors:
+            fn = "140408_scan_SHstellirr0.007_factor%.2f_I%.2f_stimloc_stim%s_NpHR_whole_ChR_whole_v.dat"%(f,i,'%g')
+            print loc+fn%3
+            shutil.move(loc+fn%3, loc+fn%2)
+
 
     
 if __name__ == '__main__':
@@ -417,5 +437,4 @@ if __name__ == '__main__':
         analyse_locations_optogen_invitro(sys.argv[2])
     else:
         print 'Unknown option'
-                                            
-                           
+                         
