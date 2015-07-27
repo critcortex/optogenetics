@@ -7,8 +7,8 @@ import logging
 import time
 
 OWNER = 'sjarvis1'
-EXECBASE = '~/git/optogenetics/'
-EXPBASE  = '~/git/optogenetics/experiments'
+EXECBASE = '~/workspace/co_optogenetics/'
+EXPBASE  = '~/workspace/co_optogenetics/experiments'
 EXPBASE_ONLY = 'experiments' # equivalent to EXPBASE - EXECBASE
 
 GROUPSERV_LOC = 'smb://bg-thefarm-2012/schultz_group_data/Jarvis_comptogen_simdata/neuron'
@@ -19,6 +19,7 @@ DEFAULT_WALLTIME = 3
 basedir = 'experiments/%s'
 subfolders = ['img','dat','pkl','out','gdf']
 filemaps = {    '*png' : 'img',
+                '*svg' : 'img',
                 '*dat' : 'dat',
                 '*pkl' : 'pkl',
                 '*jdf' : 'out',

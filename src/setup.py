@@ -20,5 +20,10 @@ for f in folders:
 # run nrnivmodl
 #call(['nrnivmodl'])
 call(['nrnivmodl nrn/mod/'])
-
 # will create executable folder
+
+
+# EXPERIMENT COLLECTION:
+"""
+sjarvis1@bg-sjarvis1.bg.ic.ac.uk:/home/sjarvis/git/exp_data_optogen/experiments/
+"""
