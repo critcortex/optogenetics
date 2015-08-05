@@ -12,7 +12,7 @@ function analyse_tree(filename,tree_index)
     trees{tree_index}.Gm = 2000; % units: S. Taken from "Princ Neural Sci", p137
     trees{tree_index}.Gi = 100;
     %trees{tree_index}.Cm = 1;
-    trees{tree_index}.D(:)=trees{tree_index}.D(:)*1000;
+    trees{tree_index}.D(:)=trees{tree_index}.D(:)*100;
     
     
     % values from Gidon & Segev 2009
