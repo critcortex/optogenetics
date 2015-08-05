@@ -5,8 +5,8 @@ EXPNAME = '_d150129_analyseTrees';
 
 start_trees
 
-PLOT_INDIV = 0;
-PLOT_SUMMARY = 0;
+PLOT_INDIV = 10;
+PLOT_SUMMARY = 10;
 
 INJ_AMOUNT = 100;
 
@@ -14,7 +14,7 @@ trees_config = [ [1 1 124] ;[1 2 7]; [2 2 6]; [2 7 3]; [2 1 62]; [2 61 2]; ...
           [4 5 3]; [4 2 5]; [4 30 2]; [4 1 31];  [11 1 11]; [11 10 2]; ...
           [18 1 7]; [18 2 3]; [18 6 2] ; [31 1 4]; [31 3 2]; [62 1 2]; [124 1 1]];
 
-%trees_config = [ [2 2 6]; ]; %[2 7 3];[18 1 7]; [18 6 2]];
+trees_config = [ [2 2 6]; ]; %[2 7 3];[18 1 7]; [18 6 2]];
 
 plot_show = '';
 if PLOT_INDIV,
@@ -29,9 +29,9 @@ data = {};
 
 for i = 1:size(trees_config,1),
     close all;
-    i
+    
     t = trees_config(i,:);
-    fname = sprintf('../tree_nb%u_nc%u_nl%u.neu',t(1),t(2),t(3));
+    fname = sprintf('../experiments/electrotonic/tree_nb%u_nc%u_nl%u.neu',t(1),t(2),t(3));
     tt = load_tree(fname);
     trees{i} = tt;
     resample_tree(i,10,'-d');
@@ -186,7 +186,8 @@ for i = 1:size(trees_config,1),
     
 end
 
-save('d150129_distalInjection.mat','-struct',data);
+%save('d150129_distalInjection.mat','-struct',data);
+save('d150129_distalInjection.mat','data');
 
 
 

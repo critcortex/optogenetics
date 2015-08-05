@@ -271,6 +271,71 @@ def scan_locations_optogen_invitro(loc):
     print irrs
 
 
+def scan_locations_optogen_illumination():
+    """
+    
+    Added 150805 - for illumination driven stellate cell response
+    """
+    count = 0
+    
+    irrs = [ a*b for a in [0.01, 0.1] for b in [1,2,5]] + list(np.arange(1.,5.1,0.25)) 
+    
+
+    for factor in factors:
+        for irr in irrs: 
+            pp = {}
+            # neuron model and params
+            pp['cell'] = ['Neuron', 'SHStellate']
+            pp['cell_params'] = {}
+            
+            # opsin
+            chrdict =  {'exp':5e-4, 'irradiance' :irr, 'pulsewidth': light_dur,'lightdelay':light_on,'interpulse_interval':250,  'n_pulses':1}
+            hrdict =  {'exp':5e-4, 'irradiance' :factor*irr, 'pulsewidth': light_dur,'lightdelay':light_on,'interpulse_interval':250,  'n_pulses':1}
+            
+            pp['opsindict'] = {}
+            if irr > 0 :
+                pp['opsindict']['ChR'] =  {'soma': chrdict,
+                                           'dendrite':chrdict}
+                pp['ChR_areas'] = {'whole'      : pp['opsindict']['ChR'].keys()}
+            else:
+                pp['ChR_areas'] = {'none'      : [None]}
+                
+            if irr > 0 and factor > 0:
+                pp['opsindict']['NpHR'] =  {'soma': hrdict,
+                                            'dendrite':hrdict}
+                pp['NpHR_areas'] = {'whole'      : pp['opsindict']['NpHR'].keys()}
+                
+            else:
+                pp['NpHR_areas'] = {'none'      : [None]}
+                
+            # general settings 
+            pp['experiment_type'] = 'opsinonly'
+            pp['savedata'] = True # False #True
+            
+            pp['tstart'] = 0
+            pp['tstop'] = tstop
+            
+            pp['mark_loc'] = {}
+            pp['mark_loc']['names'] = ['mysoma']
+            pp['mark_loc']['sections'] = ['soma']
+            pp['mark_loc']['ids'] = [(0,0.5)]
+            
+            pp['record_loc'] = {}
+            pp['record_loc']['v'] = ['mysoma']
+            
+            pp['num_threads'] = 1
+                                           
+            pp.update({'expname':expbase,
+                       'description':'irr%.3f_factor%.2f_illOnly'%(irr,factor)})
+            
+            #es.run_single_experiment(expbase, 'local', pp)
+            #return
+            count += 1
+            
+    print '%g jobs submitted'%count
+            
+
+
 def get_optdescript(irr,factor):
     opt_des = []
     if irr > 0 :
@@ -431,6 +496,8 @@ if __name__ == '__main__':
         scan_locations_optogen_invivo()
     elif sys.argv[1] == 'scan_vitro':
         scan_locations_optogen_invitro(sys.argv[2])        
+    elif sys.argv[1] == 'scan_illum':
+        scan_locations_optogen_illumination()        
     elif sys.argv[1] == 'analyse':
         analyse_locations_optogen_invivo()
     elif sys.argv[1] == 'analyse_vitro':

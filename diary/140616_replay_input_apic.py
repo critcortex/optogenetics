@@ -107,13 +107,15 @@ class Experiment_120614:
         self.nsites = 1000
         
         #self.shuffles = range(10)
-        self.shuffles = range(4,10)
+        #self.shuffles = range(4,10)
         self.shuffles = [5,6]
         
         
         
-        
-        
+        # 150805: rerun
+        self.irrs = [ a*b for a in [0.01, 0.1, 1.] for b in [1,2,5]]
+        self.factors = [0.125,0.25,0.5,1.,1.5,2.,4.,8.]
+        self.shuffles = range(1)
         
     
     
@@ -144,13 +146,15 @@ class Experiment_120614:
                                 pp['spiketrains'] = [{'tstims': spikelist,  'locations':  locnames, 'weights':weights,  'el': 0.02}]
                                 pp.update({'expname':self.expbase,
                                            'description':'irr%.3f_factor%.2f_spikes%g_J%.1f_cell%s_inh%.2f_freqfactor%g_shuffle%g_stim%s'%(irr,factor,freq,J,self.celltype,syn_factor,self.freq_factor,shuf,self.stimulus)})
-                                    
+                                 
+                                print pp['description']   
                                 self._run_single_exp(pp, irr, factor, self.whole,shuffle_id=shuf)
+                                return
                                 count += 1
                         
         print '%g jobs submitted'%count
         
-    def _run_single_exp(self,pp,irr,factor,whole,other_tag_locations=None,runon=True,shuffle_id=0):
+    def _run_single_exp(self,pp,irr,factor,whole,other_tag_locations=None,runon=False,shuffle_id=0):
         
         # neuron model and params
         pp['cell'] = ['Neuron', self.celltype]
@@ -250,12 +254,15 @@ class Experiment_120614:
                       #5:iplots_na}
         """
         pp['num_threads'] = 1
+        
+        
         if runon:
             #self.es.run_single_experiment(self.expbase, 'cluster', pp)
             self.es.run_single_experiment(self.expbase, 'missing', pp)
             
         else:
             self.es.run_single_experiment(self.expbase, 'local', pp)
+       
     
     def __get_color(self,cmap,value=0.8):
         cNorm = colors.Normalize(vmin=0,vmax=1) 
@@ -430,7 +437,7 @@ class Experiment_120614:
     def _load_spiketimes(self,filename):
         print "Trying to load spiketimes from %s.pkl"%filename, 
         #ss = np.loadtxt(filename)
-        pkl_file = open('%s.pkl'%filename, 'rb')
+        pkl_file = open('simdata/%s.pkl'%filename, 'rb')
         ss = pickle.load(pkl_file)
         pkl_file.close()
         print "... done!"
@@ -455,7 +462,7 @@ class Experiment_120614:
     def _load_input_sites(self,filename):
         print "Trying to load input sites from %s.pkl"%filename,
         #ss = np.loadtxt(filename)
-        pkl_file = open('%s.pkl'%filename, 'rb')
+        pkl_file = open('simdata/%s.pkl'%filename, 'rb')
         idx = pickle.load(pkl_file)
         pkl_file.close()
         print "... done!"

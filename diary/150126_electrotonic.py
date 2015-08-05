@@ -82,12 +82,44 @@ def save_tree(tree):
     pp['output']['neu'] = 'tree_nb%g_nc%g_nl%g.neu'%(nb,nc,nl)
     es = ExpSetup()
     es.run_single_experiment(expname, 'cluster', pp)
-    """
+    """lo
     NE = run_stimulation.NeuronExperiment()
     NE.main(pp)
     h.neu_tree('tree_nb%g_nc%g_nl%g.neu'%(nb,nc,nl))
     """
  
+def save_tree_L5PC():
+    pp = {}
+    pp['expname'] = '150126_electrotonic'
+        # neuron model and params
+    pp['cell'] = ['Neuron', 'L5PC']
+    pp['opsindict'] = {}
+    pp['record_loc'] = None
+    pp['tstop'] = 0
+    pp['description'] = 'tree_L5PC'
+    pp['savedata'] = False
+    pp['output'] = {}
+    pp['output']['neu'] = 'tree_L5PC'
+    es = ExpSetup()
+    es.run_single_experiment(expname, 'local', pp)
+
+def save_tree_SHStellate():
+    pp = {}
+    pp['expname'] = '150126_electrotonic'
+        # neuron model and params
+    pp['cell'] = ['Neuron', 'SHStellate']
+    pp['opsindict'] = {}
+    pp['record_loc'] = None
+    pp['tstop'] = 0
+    pp['description'] = 'tree_SHstellate'
+    pp['savedata'] = False
+    pp['output'] = {}
+    pp['output']['neu'] = 'tree_SHstellate'
+    es = ExpSetup()
+    es.run_single_experiment(expname, 'local', pp)
+ 
+
+
 def loop_trees():
     collection_same_total_all = [(1,1,124),(1,2,7), \
                                       (2,2,6),(2,7,3),(2,1,62),(2,61,2), \
@@ -96,7 +128,7 @@ def loop_trees():
                                       (18,1,7),(18,2,3),(18,6,2), \
                                       (31,1,4),(31,3,2), \
                                       (62,1,2),(124,1,1)]
-    
+    collection_same_total_all = [(2,2,6)]
     i = 0
     for coll in collection_same_total_all:
         save_tree(coll)
@@ -111,9 +143,8 @@ def test_trees():
     
    
 #test_treesneu()
-loop_trees()
+#loop_trees()
 #test_trees()
 
-
-
-
+save_tree_L5PC()
+#save_tree_SHStellate()

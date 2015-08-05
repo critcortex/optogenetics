@@ -1,7 +1,7 @@
 clear all
 close all
 
-EXPNAME = '_d150209_analyseTreesProximal';
+EXPNAME = '_d150209_analyseTreesProximalXX';
 
 start_trees
 
@@ -10,11 +10,14 @@ INJ_AMOUNT = 100;
 PLOT_INDIV = 0;
 PLOT_SUMMARY = 0;
 
-trees_config = [ [1 1 124] ;[1 2 7]; [2 1 62]; [2 2 6]; [2 7 3];  [2 61 2]; ...
+trees_config = [ [1 1 124] ;[1 2 7]; [2 1 62]; ... 
+          [2 2 6]; [2 7 3]; [2 61 2]; ...
           [4 5 3]; [4 2 5]; [4 30 2]; [4 1 31];  [11 1 11]; [11 10 2]; ...
-          [18 1 7]; [18 2 3]; [18 6 2] ; [31 1 4]; [31 3 2]; [62 1 2]; [124 1 1]];
+          [18 1 7]; [18 2 3]; 
+          [18 6 2] ; [31 1 4]; [31 3 2]; [62 1 2]; 
+          [124 1 1]];
 
-%trees_config = [ [2 2 6]; ]; %[2 7 3];[18 1 7]; [18 6 2]];
+trees_config = [ [2 2 6];] % [2 7 3];[18 1 7]; [18 6 2]];
 
 plot_show = '';
 if PLOT_INDIV,
@@ -22,6 +25,7 @@ if PLOT_INDIV,
 end
 
 global trees
+global resampled_trees
 
 data = {};
 
@@ -29,11 +33,22 @@ for i = 1:size(trees_config,1),
     close all;
     i
     t = trees_config(i,:);
-    fname = sprintf('../tree_nb%u_nc%u_nl%u.neu',t(1),t(2),t(3));
+    fname = sprintf('../experiments/electrotonic/tree_nb%u_nc%u_nl%u.neu',t(1),t(2),t(3));
+    fname
     tt = load_tree(fname);
+    tt = resample_tree(tt,1,'-d');
     trees{i} = tt;
-    resample_tree(i,10,'-d');
     analyse_tree(fname,i);
+    
+    
+    
+    %[xd t2] = xdend_tree(trees{i});
+    %resampled_trees{i} = t2;
+    %xdend_tree(t2,'-s');
+    %saveas(gcf,sprintf('%s_shape.png',fname),'png');
+    %close all;
+    
+    
     [a,b,c,figh] = plot_electrotonic_proximal(trees{i},t(1),t(2),t(3),1,0,plot_show);
     if PLOT_INDIV,
         title(gca,sprintf('Inj=%g for I_{photo} = 0 in tree (%g,%g,%g) - proximal',INJ_AMOUNT,t(1),t(2),t(3)));
@@ -116,6 +131,9 @@ for i = 1:size(trees_config,1),
         saveas(fig_bg,sprintf('%s%s_electrotonicRangeWithCurrent.png',fname,EXPNAME),'png')
         saveas(fig_inj,sprintf('%s%s_electrotonicRange.png',fname,EXPNAME),'png')
     end
+    close all;
+    
+    
     
     
     close all;
@@ -182,7 +200,8 @@ for i = 1:size(trees_config,1),
 end
 
 
-save('d150209_proximalInjection.mat','-struct',data);
+%save('d150209_proximalInjection.mat','-struct',data);
+save('d150209_proximalInjection.mat','data');
 
 
 
