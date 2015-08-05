@@ -10,13 +10,16 @@ import pickle as pkl
 import itertools
 import NeuroTools.signals  
 import math
+from xdg.Menu import tmp
 
 DEFAULT_FREQ = [0.5,1,1.5,2,2.5,4,5,6,7,8,9,10,15,20,30,35,40,45,50]
 DEFAULT_IRRAD = [1,2,5,10,20,50,100]
 DEFAULT_PARAMS = {'FREQ':DEFAULT_FREQ,'IRRAD':DEFAULT_IRRAD}
 DEFAULT_ANALYSIS_SETTINGS = {'v_th': -20., 'tstart':200,'tstop':2000,'prebuffer':300,'postbuffer':150,'tstart_bg':0,'tstop_bg':0,'tstart_post':0,'tstop_post':0}
 
-FUNCTION_LOOKUP = {'isi':'calc_feature',
+FUNCTION_LOOKUP = {'isi':'calc_isi',
+                   'isi_bg':'calc_isi_bg',
+                   'isi_post':'calc_isi_post',
                    'cv_isi':'calc_feature',
                    'cv_kl':'calc_feature',
                    'fano_factor_isi':'calc_feature',
@@ -192,11 +195,11 @@ class AnalyticFrame:
         for exps in self.experimentset:
             exps.run_analysis(analysis_fns)        
             
-    def perform_analysis(self,analysis_features=[]):
+    def perform_analysis(self,analysis_features=[],recalc=False):
         #for feature in analysis_features:
         #    print feature,'='*60
         for exps in self.experimentset:
-            exps.run_analysis(analysis_features)
+            exps.run_analysis(analysis_features,recalc)
         
     def submenu_save(self):
         print 'Save values'
@@ -307,7 +310,16 @@ class AnalyticFrame:
         m_NpHR = self.experimentset[-1].results[mitype][0] # NpHR max
         return m_ChR2/m_NpHR
         
+    def get_analysis_values(self,key):
+        """
         
+        """
+        results = []
+        for exp in self.experimentset:
+            tmp = exp.get_property(key)
+            print tmp
+            results.append(tmp)
+        return results
         
 class ExperimentPlotter:
     
@@ -1603,7 +1615,7 @@ class ExperimentSet:
             exp.save_results()
             
         # calculate experimentset values
-        self.get_datafit()
+        #self.get_datafit()
         
     def get_datafit(self):
         # Try all type of curve to get best fit for injected and bg
@@ -1695,7 +1707,8 @@ class ExperimentSet:
     def print_exps(self,indent=4):
         print self.basename,self.subselect, 'contains experiments:'
         for exp in self.experiments:
-            print ' '*indent, exp, '\t'*4, exp.results
+            print ' '*indent, exp 
+            print ' '*indent, exp.results
             
     
     def print_data(self,indent=4):
@@ -2068,6 +2081,48 @@ class Experiment:
             print ts
         return ts, i_photo
         
+    def calc_isi(self,**params):
+        return self.calc_isi_generic(self.analysis_params['tstart'],self.analysis_params['tstop'],field='isi')
+
+    def calc_isi_bg(self,**params):
+        #print 'calc_firing rate_bg',
+        return self.calc_isi_generic(self.analysis_params['tstart_bg'],self.analysis_params['tstop_bg'],field='isi_bg')
+    
+    def calc_isi_post(self,**params):
+        #print 'calc_firing rate_post',
+        return self.calc_isi_generic(self.analysis_params['tstart_post'],self.analysis_params['tstop_post'],field='isi_post')
+        
+    def calc_isi_generic(self,tstart,tstop,field):
+        try:
+            if self.spikes is not None:
+                spikes = self.spikes
+            elif self._check_spikefile_exists():
+                spikes = self.load_spikes()
+            else:
+                data = np.loadtxt(self.get_dat_file()) 
+                t,v_soma = data[0,:],data[1,:]
+                spikes = self.extract_spiketimes(t,v_soma)
+            if len(spikes)==0:
+                print 'No spikes observed during entire duration'
+                self.results[field] = 0
+                return 0
+            spikes = np.where((spikes >= tstart) & (spikes <= tstop))[0]
+            
+            #isi = 
+            self.get_spiketrain(tstart,tstop)
+            # set isi for bg/post/stim
+            self.results[field] = self.calc_feature('isi')
+            print('Generated ISI')
+            # and while we're here, also set it for cvisi and fano factor
+            self.results['cv_'+field] = self.calc_feature('cv_isi')
+            self.results['ff_'+field] = self.calc_feature('fano_factor_isi')
+            print('Generated CV and FF for ISI')
+        except:
+            print "Unexpected error:", sys.exc_info()[0]
+            print '-'*40
+            return -1
+
+
 
     def calc_firingrate(self,**params):
         """
@@ -2139,11 +2194,16 @@ class Experiment:
             return None
 
 
-    def get_spiketrain(self):
+    def get_spiketrain(self,tstart=None,tstop=None):
+        if tstart is None:
+            tstart = self.analysis_params['tstart']
+        if tstop is None:
+            tstop = self.analysis_params['tstop']
+        
         if self.spiketrain is not None:
             pass
         elif self.spiketrain is None and self.spikes is not None:
-            self.spiketrain = NeuroTools.signals.SpikeTrain(self.spikes,self.analysis_params['tstart'],self.analysis_params['tstop'])
+            self.spiketrain = NeuroTools.signals.SpikeTrain(self.spikes,tstart,tstop)
         elif self.spikes is None:
             print 'Could not create spiketrain'
         return self.spiketrain
