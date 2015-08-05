@@ -291,6 +291,8 @@ class NeuronInterface(Cell):
             
             plt.show()
         '''
+        
+        
         polygons = []
         for i in np.arange(self.totnsegs):
             polygons.append(self._create_segment_polygon_xy(i))
@@ -369,6 +371,9 @@ class SHStellate(NeuronInterface):
         for sec in self.somalist:
             self.soma = sec
         h.v_init = params['v_init']
+        self.synapses = []
+        #x,y,z,r = self._collect_pt3d()
+        self.pt3d=False
         
     def populate_sectionlists(self):
         self.domainlists = {}
