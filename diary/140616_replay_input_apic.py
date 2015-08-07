@@ -117,6 +117,8 @@ class Experiment_120614:
         self.factors = [0.125,0.25,0.5,1.,1.5,2.,4.,8.]
         self.shuffles = range(1)
         
+        self.shuffles = [5]
+        
     
     
     def run_experiments(self):
@@ -149,12 +151,12 @@ class Experiment_120614:
                                  
                                 print pp['description']   
                                 self._run_single_exp(pp, irr, factor, self.whole,shuffle_id=shuf)
-                                return
+                                #return
                                 count += 1
                         
         print '%g jobs submitted'%count
         
-    def _run_single_exp(self,pp,irr,factor,whole,other_tag_locations=None,runon=False,shuffle_id=0):
+    def _run_single_exp(self,pp,irr,factor,whole,other_tag_locations=None,runon=True,shuffle_id=0):
         
         # neuron model and params
         pp['cell'] = ['Neuron', self.celltype]

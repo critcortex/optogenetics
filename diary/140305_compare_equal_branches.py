@@ -86,6 +86,11 @@ class Experiment_140305:
         self.freqs = range(10,101,10)
         """
         
+        # MOD 150805:
+        self.factors = [0.5,0.75,1.,1.25,1.5,2.]
+        self.freqs = range(10,101,10)
+        self.irrs = [0.05]
+        self.collection_same_total = [(2,2,6),(2,7,3),(4,5,3)]
     
     
     def get_dendritic_colors(self,num_levels):
@@ -414,14 +419,11 @@ class Experiment_140305:
     def run_collection_spiketrain_soma(self,whole=True):
         collection = self.collection_same_total
         nsegs = 10
-        stim_interval = 50.
         count = 0
         for tree in collection:
             nb,nc,nl = tree
             if nb == 1 and not whole:
                 continue
-            
-            show_levels = np.min([nl,5])
             for factor in self.factors:
                 for irr in self.irrs: 
                     for freq in self.freqs:
@@ -442,6 +444,7 @@ class Experiment_140305:
                             
                             self.run_collection_generic(pp,tree,irr,factor,whole,other_tag_locations=(spbases,splabels,splocs))#,runon=False)
                             #return
+                            #print pp['description']
                             count += 1
             #return
                     
@@ -564,24 +567,32 @@ class Experiment_140305:
                     descript = 'proximal'
                     exp_comp_list = [['irr0.05'+'_factor%.2f'%(factor)+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'spikes%g'+'_loc%g_J%.1f'%(0,self.Js[0])+'_NpHR_%s_ChR_%s'%(exp,exp),'%g'%factor] for factor in self.factors]
                 elif etype =='soma':
-                    descript = 'somal'
-                    exp_comp_list = [['irr0.05'+'_factor%.2f'%(factor)+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'spikes%g'+'_loc%s_J%.1f'%('soma',1)+'_NpHR_%s_ChR_%s'%(exp,exp),'%g'%factor] for factor in self.factors]
+                    descript = 'soma'
+                    exp_comp_list = [['irr0.05'+'_factor%.2f'%(factor)+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'spikes%g'+'_loc%s_J%.1f'%('soma',self.Js[0])+'_NpHR_%s_ChR_%s'%(exp,exp),'%g'%factor] for factor in self.factors]
                 elif etype =='distal':
                     descript = 'distal'
                     exp_comp_list = [['irr0.05'+'_factor%.2f'%(factor)+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'spikes%g'+'_loc%g_J%.1f'%(tree[2]-1,self.Js[0])+'_NpHR_%s_ChR_%s'%(exp,exp),'%g'%factor] for factor in self.factors]
                 print exp_comp_list
-        
+                
                 expss = [ec[0] for ec in exp_comp_list]
                 explabels = [ec[1] for ec in exp_comp_list]
                 af.populate_expset(self.expbase,expss,explabels,[self.freqs])
+                af.submenu_extractSpikes()
+                """
                 
-        
-                
+                af.submenu_runFI()
+                for exp in af.experimentset:
+                    exp.calculate_responses('FI')
+                    exp.calculate_responses('FI_bg')
+                    exp.calculate_responses('FI_post')
+                af.submenu_save()
+
+                """
                 af.submenu_load()
-                af.submenu_print()
-                #af.submenu_plot(5, self.expbase+'FI_gain_irr%.2f_tree%s_varyFactor_exp%s%s_'%(0.05,tree,exp[0],exp[1]))
+                #af.submenu_print()
+                af.submenu_plot(5, self.expbase+'_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'_inj%s'%(descript))
                 #af.submenu_plot(0, self.expbase+'FI_gain_irr%.2f_tree%s_varyFactor_exp%s%s_'%(0.05,tree,exp[0],exp[1]))
-                af.submenu_plot(10, self.expbase+'FI_gain_bg_irr%.2f_tree%s_%s_varyFactor_exp%s%s_'%(0.05,tree,descript,exp,exp))
+                af.submenu_plot(10, self.expbase+'bg_nb%g_ns%g_nl%g_'%(tree[0],tree[1],tree[2])+'inj%s'%(descript))
 
 
 

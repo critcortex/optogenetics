@@ -328,7 +328,7 @@ def scan_locations_optogen_illumination():
             pp.update({'expname':expbase,
                        'description':'irr%.3f_factor%.2f_illOnly'%(irr,factor)})
             
-            #es.run_single_experiment(expbase, 'local', pp)
+            es.run_single_experiment(expbase, 'missing', pp)
             #return
             count += 1
             
@@ -443,6 +443,40 @@ def analyse_locations_optogen_invitro(stimloc):
     af.submenu_plot(10, expbase)
     """
 
+def analyse_locations_optogen_ill():
+    
+    irrs = [ a*b for a in [0.01, 0.1] for b in [1,2,5]] + list(np.arange(1.,5.1,0.25)) 
+    af = run_analysis.AnalyticFrame()
+    af.update_params({'tstart':0,'tstop':tstop,'label_format':'irr%.2f_factor%.2f_nb%g_ns%g_nl%g_spikes%g_loc%s_J%.1f'})
+
+    af.update_params({'tstart':light_on,'tstop':light_on+light_dur,
+                          'tstart_bg': 0,'tstop_bg':light_on,
+                          'tstart_post':light_on+light_dur,'tstop_post':tstop})
+    optlog = get_optdescript('tmp',1)
+    #'irr%.3f_factor%.2f_illOnly'%(irr,factor)
+    exp_comp_list = [['irr%.3f_'+'factor%.2f_'%f+'illOnly_NpHR_%s_ChR_%s'%(optlog[1],optlog[0]),'=%.3f'%f] for f in factors]
+    #irr%.3f_factor%.2f_I%.2f_stimloc_%s'
+    print exp_comp_list
+
+    expss = [ec[0] for ec in exp_comp_list]
+    explabels = [ec[1] for ec in exp_comp_list]
+    print explabels
+    
+    af.populate_expset(expbase,expss,explabels, [irrs])
+    
+    
+    af.submenu_extractSpikes()
+    af.submenu_runFI()
+    for exp in af.experimentset:
+        exp.calculate_responses('FI')
+        exp.calculate_responses('FI_bg')
+        exp.calculate_responses('FI_post')
+    af.submenu_save()
+        
+    af.submenu_print()
+        
+
+
 """ Added the following three methods from 140612_replay_input
 def _save_input_sites(self,filename,idx):
     output = open(filename+'.pkl','wb')
@@ -502,6 +536,8 @@ if __name__ == '__main__':
         analyse_locations_optogen_invivo()
     elif sys.argv[1] == 'analyse_vitro':
         analyse_locations_optogen_invitro(sys.argv[2])
+    elif sys.argv[1] == 'analyse_ill':
+        analyse_locations_optogen_ill()
     else:
         print 'Unknown option'
                          
