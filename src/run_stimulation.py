@@ -522,31 +522,33 @@ class NeuronExperiment:
                 sec = self.outputparams['tagged_locations'][loc][1]
                 posn = self.outputparams['tagged_locations'][loc][2]
                 tmprec = h.Vector()
-                #print recordable
-                if recordable == 'iphoto':
+                #if recordable == 'iphoto':
+                if recordable == 'iChR' or recordable == 'iNpHR' :
+                    print('Attempting to record iphoto:')
                     #fnrec = getattr(sec,'%s'%recordable)
-                    for (opsin,v) in self.outputparams['expressed_opsin'].iteritems():
-                        """
-                        print opsin,v
-                        print v.hname() 
-                        #firstobj =  v.o(0)
-                        print dir(v)
-                        print dir(v.o(0))
-                        print dir(v.o(41))
-                        print dir(v.o(210))
-                        print dir(v.o(641))
-                        print v.o(0).iChR
-                        """
-                        # TODO: should make this dynamic ... 
-                        if opsin == 'ChR':
-                            tmprec.record(h.ref(v.o(0).iChR)) # record in soma
-                        elif opsin == 'NpHR':
-                            tmprec.record(h.ref(v.o(0).iNpHR))
-                        else:
-                            print 'Could not record photocurrent for %s'%opsin
+                    
+                    """
+                    Note that this will only ever record the first section in the Neuron object. 
+                    As this is typically the soma, these results therefore only ever hold for the soma
+                    
+                    """
+                    #TODO see if this can be extended for any section 
+                        
+                    if recordable == 'iChR':
+                        print('Recording iChR')
+                        #tmprec.record(h.ref(v.o(0).iChR)) # record in soma
+                        tmprec.record(h.ChR[0]._ref_iChR)
+                    elif recordable == 'iNpHR':
+                        print('Recording iNpHR')
+                        #tmprec.record(h.ref(v.o(0).iNpHR))
+                        tmprec.record(h.NpHR[0]._ref_iNpHR)
+                    else:
+                        print 'Could not record photocurrent for %s'%recordable
+                    
                         #print tmprec
+                        #tmprec.record(h.ChR[0]._ref_iChR)
                         #h('tmprec.record(&ChR[0].iChR,i_ChR,rec_t)')
-                        break
+                        #break
                        
                         #tmp = getattr(firstobj,'iNpHR')
                     #tmprec.record(tmp)  
@@ -739,19 +741,59 @@ class NeuronExperiment:
                 return len(self.params['record_loc'][typerec])
         
         return 0
-        
+    """
+    def get_recording_prefixs(self,prefix):
+        pass
+    
+    def _save_data(self,prefix):
+        prefixs = self.get_recording_prefixs(prefix)
+        if len(prefixs) == 0:
+            print('No data to save for prefix %s!'%prefix)
+            return
+        mat = np.zeros((len(prefixs)+1,int(len(self.rec_t))))
+        mat[0,:] = self.rec_t
+        for (i,rec) in enumerate(prefixs):
+            mat[i+1,:] = self.outputparams['%s_rec']['%s_%s'%(prefix,self.params['record_loc']['v'][i])]
+    """   
+    
     def save_data(self):#,expname,savedata=False,opsindict={}):
         """
         
+        
         """
+        
+        print('==================')
+        print self.params['record_loc']
+        print self.outputparams
+        print('============record_loc======')
+        
+        
         expname = self.params['expname']
         if "savedata" not in self.params or not self.params['savedata']: 
             print("Not saving data")
             return
         
         import numpy as np
+        # Updated: 06/10/15 - 
         # save recorded voltages, currents, etc.
+        # new stronger method for saving to file
+        # save all voltages in same file
+        # same for all currents, in their separate i
+        # same for conductances
+
+        # Version 2 06/10/15 - save everything into its own file with extension. Sigh. Much easier
+        if self.params.has_key('record_loc') and self.params['record_loc'] is not None:
+            for (k,v) in self.params['record_loc'].iteritems():
+                if len(v)==0:
+                    continue
+                # else print
+                mat = np.zeros((2,int(len(self.rec_t))))
+                mat[0,:] = self.rec_t
+                mat[1,:] = self.outputparams['%s_rec'%k]['%s_%s'%(k,self.params['record_loc'][k][0])]
+                np.savetxt(expname+"_%s.dat"%k,mat)
+                
         
+        """
         #mat = np.matrix([self.rec_t])
         mat = np.zeros((self.num_recording_areas('v')+1,int(len(self.rec_t))))
         mat[0,:] = self.rec_t
@@ -773,7 +815,7 @@ class NeuronExperiment:
         except:
             print 'error with saving data ... '
             
-        
+        """
         #if len(self.params['opdict'].keys())==0:
         #######    return
         """
@@ -834,7 +876,7 @@ class NeuronExperiment:
                     h('savdata.close()')
     
     
-    def plot_optogenetics(self,max_val=40):
+    def plot_optogenetics(self,max_val=40,min_val=-100):
         
         if self.params.has_key('opsindict'):
             #print self.params['opsindict']
@@ -845,7 +887,8 @@ class NeuronExperiment:
                         continue
                     for pulsenum in range(opexp['n_pulses']):                
                         pulse_start = opexp['lightdelay']+pulsenum*(opexp['pulsewidth']+opexp['interpulse_interval'])
-                        self.plot_optogenetic(opsin,pulse_start,pulse_start+opexp['pulsewidth'],yoffset=max_val)
+                        yoffset = (max_val+min_val)/2.
+                        self.plot_optogenetic(opsin,pulse_start,pulse_start+opexp['pulsewidth'],yoffset=yoffset)
                     # once we've plotted an activation for one area, that should be sufficient i.e. we don't need to plot apical *and* soma, only the first 
                     # TODO: think how to extend this to allow for different areas to be indicated i.e. ChR in soma vs ChR in apical dendritic arbor
                     break
@@ -888,6 +931,7 @@ class NeuronExperiment:
                     pylab.plot(self.rec_t,self._get_vector(line))
             print "\nMax was ", self._get_vector(line).max(),'\n'
             max_val = self._get_vector(line).max()
+            min_val = self._get_vector(line).min()
             pylab.xlim(self.rec_t[0]-20,self.rec_t[-1]+20)
             ax = pylab.gca()
             for loc, spine in ax.spines.iteritems():
@@ -898,7 +942,7 @@ class NeuronExperiment:
                     spine.set_color('none') 
             pylab.xlabel('time (ms)')
             
-            self.plot_optogenetics(max_val=max_val)
+            self.plot_optogenetics(max_val=max_val,min_val=min_val)
             
             if self.params['expname'] is not None:
                 savename = '%s_fig%s.png'%(self.params['expname'],figid)
