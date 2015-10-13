@@ -35,7 +35,7 @@ EXP_IMG_LOCATION = 'experiments/%s/img/'
 EXP_PKL_LOCATION = 'experiments/%s/pkl/'
 EXP_GDF_LOCATION = 'experiments/%s/gdf/'
 
-CMAPS = ['jet','YlOrRd','YlGnBu_r','spectral','YlGnBu_r','YlOrRd','GnBu','jet','CMAP_ORANGE_BLUE','CMAP_BLUE_ORANGE','CMAP_FULL_BLUE_ORANGE','r_pink','hot_r']
+CMAPS = ['jet','YlOrRd','YlGnBu_r','spectral','YlGnBu_r','YlOrRd','GnBu','hsv','CMAP_ORANGE_BLUE','CMAP_BLUE_ORANGE','CMAP_FULL_BLUE_ORANGE','r_pink','hot_r','Paired','rainbow','gist_rainbow']
 
 
 OPSINS_IPHOTO = {'ChR': False, 
@@ -45,7 +45,12 @@ OPSINS_IPHOTO = {'ChR': False,
 RC_SETTINGS = {'paper': {'lw': 3, 
                          'lw_fine':1,
                          'alpha':0.5,
-                         'dpi':100,
+                         'dpi':300,
+                         'figure.dpi':300,
+                         'savefig.dpi':300,
+                         'lw_fine':2,
+                         'alpha':0.75,
+                         'font.size':16,
                          'colors':['r','b','k','g','y','r','b','k','g','y'],
                          'cmaps':CMAPS},
                'poster': {'lw': 4, 
@@ -55,7 +60,7 @@ RC_SETTINGS = {'paper': {'lw': 3,
                           'figure.dpi':300,
                           'savefig.dpi':300,
                           'lw_fine':2,
-                          'alpha':0.5,
+                          'alpha':0.75,
                           'font.size':16,
                           'colors':['r','b','k','g'],
                           'cmaps':CMAPS}}
@@ -347,6 +352,9 @@ class ExperimentPlotter:
         else:
             self.cmap = self.load_cmap(rcsettings['cmaps'][self.cmap_index])
     
+    def get_cmap(self):
+        return self.cmap
+    
     def print_header(self,plottype,expset):
         print '='*40
         print 'Creating %s plot for expset = %s'%(plottype,str(expset))
@@ -381,7 +389,8 @@ class ExperimentPlotter:
         cm = colors.ListedColormap(a/255)
         return cm
         
-    
+    def _get_color(self,cmap,value=0.8):
+        return self.__get_color(cmap, value)
     
     def __get_color(self,cmap,value=0.8):
         cNorm = colors.Normalize(vmin=0,vmax=1) 
@@ -647,7 +656,8 @@ class ExperimentPlotter:
         
         #pylab.ylim(ymin=ys[0]-np.abs(ys[0])*0.1)
         #pylab.ylim(ymax=ys[-1]+np.abs(ys[-1])*0.1)
-        pylab.xlim(xmin=xs[0][0]-np.abs(xs[0][0])*0.1)
+        pylab.xlim(xmin=xs[0][0]-np.abs(xs[0][0])*0.15)
+        #pylab.xlim(xmin=0)
         pylab.xlim(xmax=xs[0][-1]+np.abs(xs[0][-1])*0.1)
         
         cbarlabels = labels
@@ -955,8 +965,11 @@ class ExperimentPlotter:
             
             if savefig is not None:
                 figname = '%s_voltage_trace_%s_expset%g.png'%(savefig,time.strftime('%y%m%d'),i)
-                pylab.savefig(figname)
+                pylab.savefig(figname,dpi=rcsettings['dpi'])
                 print 'Saved figure as %s'%figname
+                figname = '%s_voltage_trace_%s_expset%g.svg'%(savefig,time.strftime('%y%m%d'),i)
+                pylab.savefig(figname,dpi=rcsettings['dpi'])
+                print 'Saved figure as %s'%figname        
 
     def plot_IClamp_FR(self,experimentsets,savefig=None,settings='paper'):
         """
@@ -1344,6 +1357,9 @@ class ExperimentPlotter:
                 figname = '%s_%s_2DcompareFI_%s.png'%(savefig,expset,time.strftime('%y%m%d'))
                 pylab.savefig(figname,dpi=rcsettings['dpi'])
                 print 'Saved figure as %s'%figname
+                figname = '%s_%s_2DcompareFI_%s.svg'%(savefig,expset,time.strftime('%y%m%d'))
+                pylab.savefig(figname,dpi=rcsettings['dpi'])
+                print 'Saved figure as %s'%figname
             pylab.close('all')
             
         
@@ -1613,9 +1629,10 @@ class ExperimentSet:
             print 'About to run analysis for ',str(exp)
             exp.calculate_results(analysis_fns, recalc)
             exp.save_results()
-            
+    
+    def run_gradient(self,eval_x=None):
         # calculate experimentset values
-        #self.get_datafit()
+        self.get_datafit()
         
     def get_datafit(self):
         # Try all type of curve to get best fit for injected and bg
