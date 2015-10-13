@@ -447,7 +447,7 @@ def analyse_locations_optogen_ill():
     
     irrs = [ a*b for a in [0.01, 0.1] for b in [1,2,5]] + list(np.arange(1.,5.1,0.25)) 
     af = run_analysis.AnalyticFrame()
-    af.update_params({'tstart':0,'tstop':tstop,'label_format':'irr%.2f_factor%.2f_nb%g_ns%g_nl%g_spikes%g_loc%s_J%.1f'})
+    af.update_params({'tstart':0,'tstop':tstop,'label_format':'irr%.2f_factor%.2f_nb%g_ns%g_nl%g_illOnly%g_loc%s_J%.1f'})
 
     af.update_params({'tstart':light_on,'tstop':light_on+light_dur,
                           'tstart_bg': 0,'tstop_bg':light_on,

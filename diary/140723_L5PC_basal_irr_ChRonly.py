@@ -53,15 +53,19 @@ celltype = 'L5PC'
 
 #######################
 factors = [0.125,0.25,0.5,1.,2.,4.,8.]
-factors = [0.125,0.25,0.5,0.75,1.,1.5,2.] # for vitro
-factors = [0.001,0.125,0.25,0.5,0.75,1.] # for vivo
+#factors = [0.125,0.25,0.5,0.75,1.,1.5,2.] # for vitro
+#factors = [0.001,0.125,0.25,0.5,0.75,1.] # for vivo
 #factors = [0.001]
+#factors = [2.,4.,8.]
 
 
-
-irrs = [0.01,0.02]
+#irrs = [0.01,0.02]
 irrs = [0.001,0.002]
 
+# update 05/10/15
+iclamp_amps =[0]
+factors = [0.001,0.125,0.25,0.5,0.75,1.,1.5,2.]
+factors = [0.5]
 
 def get_spiketimes(rate,num_inputs):
     spikes = []
@@ -343,6 +347,122 @@ def scan_locations_optogen_invitro(stimloc):
                 #es.run_single_experiment(expbase, 'local', pp)
                 #es.run_single_experiment(expbase, 'names', pp)
                 count += 1
+                #return
+                
+            """
+                
+                NE = run_stimulation.NeuronExperiment()
+                ES = ExpSetup()
+                dp = ES.get_default_params()
+                dp.update(pp)
+                NE.main(dp)
+                return pp
+        
+            """
+    print '%g jobs submitted'%count
+
+def scan_locations_optogen_invitro_iPhoto(stimloc):
+    """
+    Added function on 06/10/15 to try and record photocurrents for 
+    iChR and iNpHR
+    
+    
+    
+    """
+    #iclamp_amps = [0]
+    count = 0
+
+    for factor in factors:
+        for irr in irrs: 
+            for Ia in iclamp_amps:
+                
+                
+                pp = {}
+                # neuron model and params
+                pp['cell'] = ['Neuron',celltype]
+                pp['cell_params'] = {}
+                
+                # opsin
+                chrdict =  {'exp':5e-4, 'irradiance' :irr, 'pulsewidth': light_dur,'lightdelay':light_on,'interpulse_interval':250,  'n_pulses':1}
+                hrdict =  {'exp':5e-4, 'irradiance' :factor*irr, 'pulsewidth': light_dur,'lightdelay':light_on,'interpulse_interval':250,  'n_pulses':1}
+                
+                pp['opsindict'] = {}
+                if irr > 0 : 
+                    pp['opsindict']['ChR'] =  {}
+                    for area in areas[celltype]:
+                        pp['opsindict']['ChR'][area] = chrdict
+                    if len(areas[celltype])==TOTAL_NUM_AREAS[celltype]:
+                        pp['ChR_areas'] = {'whole'      : pp['opsindict']['ChR'].keys()}
+                    else:
+                        pp['ChR_areas'] = {'partial'      : pp['opsindict']['ChR'].keys()}
+                else:
+                    pp['ChR_areas'] = {'none'      : [None]}
+                    
+                if irr > 0 and factor > 0 : 
+                    pp['opsindict']['NpHR'] =  {}
+                    for area in areas[celltype]:
+                        pp['opsindict']['NpHR'][area] = hrdict
+                    if len(areas[celltype])==TOTAL_NUM_AREAS[celltype]:
+                        pp['NpHR_areas'] = {'whole'      : pp['opsindict']['NpHR'].keys()}
+                    else:
+                        pp['NpHR_areas'] = {'partial'      : pp['opsindict']['NpHR'].keys()}
+                    
+                else:
+                    pp['NpHR_areas'] = {'none'      : [None]}
+                    
+                # general settings 
+                pp['experiment_type'] = 'opsinonly'
+                pp['savedata'] = True # False #True
+                
+                pp['tstart'] = 0
+                pp['tstop'] = 1500 #tstop
+                
+                nsites = 1
+                labels = ['stim%g'%i for i in range(2*nsites)]
+                
+                
+                pp['mark_loc'] = {}
+                pp['mark_loc']['names'] = ['mysoma','distal']+labels
+                pp['mark_loc']['sections'] = ['soma','apic']+['apic']*nsites+['dend']*nsites
+                pp['mark_loc']['ids'] = [(0,0.5),(0,0.972326)] + [('select_section_posn_bydistance',{'sectionarea':'apic','mindist':dist[0],'maxdist':dist[1]}) for i in range(nsites)] + [('select_section_posn_bydistance',{'sectionarea':'dend','mindist':dist[0],'maxdist':dist[1]}) for i in range(nsites)] 
+                
+                             
+                
+                pp['record_loc'] = {}
+                pp['record_loc']['v'] = ['mysoma'] #+labels
+                #pp['record_loc']['ina'] = ['mysoma']
+                #pp['record_loc']['ik'] = ['mysoma']
+                pp['record_loc']['iChR'] = ['mysoma']
+                pp['record_loc']['iNpHR'] = ['mysoma']
+                
+                
+                
+                pp['stim_iclamp'] = True
+                #print labels[0]
+                #pp['spiketrains'] = [{'tstims': get_spiketimes(freq,nsites), 'locations': labels, 'weights':np.ones(nsites)*J,  'el': 0.1}]
+                
+                pp['iclamp'] = [{'tstim': 0,  'location': stimloc, 'amp':Ia, 'duration':tstop}]
+                       
+                
+                
+                vplots_soma = [['mysoma','v','k']]
+                iPhoto_soma = [['mysoma','iChR','b'],['mysoma','iNpHR','#FFA500']]
+                #iPhoto2_soma = [['mysoma','i_ChR','b'],['mysoma','i_NpHR','#FFA500']]
+                #iplots_soma = [['mysoma','ina','g'],['mysoma','ik','b']]
+                pp['plot'] = {1:vplots_soma,
+                              2:iPhoto_soma}
+                              #3:iPhoto2_soma} 
+                    
+                
+                pp['num_threads'] = 1
+                                           
+                pp.update({'expname':expbase,
+                           'description':'irr%.3f_factor%.2f_I%.2f_stimloc_%s_iPhotoRec'%(irr,factor,Ia,stimloc)})
+    
+                #es.run_single_experiment(expbase, 'missing', pp)
+                es.run_single_experiment(expbase, 'local', pp)
+                #es.run_single_experiment(expbase, 'names', pp)
+                count += 1
                 return
                 
             """
@@ -356,6 +476,7 @@ def scan_locations_optogen_invitro(stimloc):
         
             """
     print '%g jobs submitted'%count
+
 
 
 def get_optdescript(irr,factor):
@@ -527,14 +648,14 @@ def analyse_locations_optogen_invivo_constant():
 def analyse_locations_optogen_invitro():
     
     
-    for f in [1.]: #factors:
+    for f in factors:
         af = run_analysis.AnalyticFrame()
     
         af.update_params({'tstart':light_on,'tstop':light_on+light_dur,
                               'tstart_bg': 50,'tstop_bg':light_on,
                               'tstart_post':light_on+light_dur,'tstop_post':tstop})
         
-        exp_comp_list = [['irr%.3f_'%irr+'factor%.2f_'%f+'I%.2f'+'_stimloc_distal'+'_NpHR_%s_ChR_%s'%(get_optdescript(irr,f)[1],get_optdescript(irr,f)[0]),'%.3f'%irr] for irr in irrs]
+        exp_comp_list = [['irr%.3f_'%irr+'factor%.2f_'%f+'I%.2f'+'_stimloc_stim0'+'_NpHR_%s_ChR_%s'%(get_optdescript(irr,f)[1],get_optdescript(irr,f)[0]),'%.3f'%irr] for irr in irrs]
         #irr%.3f_factor%.2f_I%.2f_stimloc_%s'
 
         print exp_comp_list
@@ -550,7 +671,7 @@ def analyse_locations_optogen_invitro():
         
         af.submenu_print()
         
-        """
+        
         af.submenu_runFI()
         for exp in af.experimentset:
             exp.calculate_responses('FI')
@@ -559,7 +680,7 @@ def analyse_locations_optogen_invitro():
             #return
         af.submenu_save()
         af.submenu_print()
-        
+        """
         
         af.submenu_plot(5, expbase+'FI_gain_varyIrr')
         af.submenu_plot(0, expbase+'FI_gain_varyIrr')
@@ -630,4 +751,4 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'analyse_vitro_irrs':
         analyse_factors_invitro()
                                             
-                           
+scan_locations_optogen_invitro_iPhoto('stim0')                           

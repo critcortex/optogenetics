@@ -91,7 +91,24 @@ class Experiment_140305:
         self.freqs = range(10,101,10)
         self.irrs = [0.05]
         self.collection_same_total = [(2,2,6),(2,7,3),(4,5,3)]
-    
+        
+        # MOD 150811:
+        self.factors = [0.5,0.75,1.,1.25,1.5,2.]
+        #self.freqs = range(10,101,10)
+        self.irrs = [ a*b for a in [0.01,0.1,1.,10.] for b in [1.,2.,5.]]
+        #self.irrs = [ a*b for a in [0.01] for b in [1.,2.,5.]]
+        self.collection_same_total = [(2,2,6)]
+        self.factors = [0.0,0.5] #0.12,0.25,0.5,0.75,1.]
+        # MOD 150813
+        #self.Js =[10000]
+        #self.freqs = range(10,101,10)
+        #self.freqs = [10,50,100]
+        #self.factors = [0.0]
+        #self.irrs = [ a*b for a in [0.01,0.1,1.,10.] for b in [1.]]
+        self.factors = [0.1*a for a in range(11)] + [2.,5.,10.]
+        self.irrs = [ a*b for a in [1.0] for b in [1.]]
+        #self.Js =[10,100,1000]
+        self.collection_same_total = [(1,1,124),(1,2,7),(2,2,6),(4,5,3),(4,1,31),(31,1,4)]
     
     def get_dendritic_colors(self,num_levels):
         """
@@ -187,6 +204,8 @@ class Experiment_140305:
         #print locs
         chrdict =  {'exp':5e-4, 'irradiance' :irr, 'pulsewidth': self.light_dur,'lightdelay':self.light_on,'interpulse_interval':250,  'n_pulses':1}
         hrdict =  {'exp':5e-4, 'irradiance' :factor*irr, 'pulsewidth': self.light_dur,'lightdelay':self.light_on,'interpulse_interval':250,  'n_pulses':1}
+        #chrdict =  {'exp':5e-2, 'irradiance' :irr, 'pulsewidth': self.light_dur,'lightdelay':self.light_on,'interpulse_interval':250,  'n_pulses':1}
+        #hrdict =  {'exp':5e-2, 'irradiance' :factor*irr, 'pulsewidth': self.light_dur,'lightdelay':self.light_on,'interpulse_interval':250,  'n_pulses':1}
         
         
         pp['opsindict'] = {}
@@ -256,13 +275,14 @@ class Experiment_140305:
         
         pp['record_loc'] = {}
         pp['record_loc']['v'] = ['mysoma']+labels+otherbaseslabels
-        pp['record_loc']['ina'] = ['mysoma']+labels+otherbaseslabels
-        pp['record_loc']['ik'] = ['mysoma']+labels+otherbaseslabels
+        #pp['record_loc']['ina'] = ['mysoma']+labels+otherbaseslabels
+        #pp['record_loc']['ik'] = ['mysoma']+labels+otherbaseslabels
         #pp['record_loc']['ik'] = labels+otherbaseslabels
         #pp['record_loc']['ica'] = labels+otherbaseslabels
         
         
         vplots_soma = [['mysoma','v','k']]
+        """
         iplots_soma = [['mysoma','ina','g'],['mysoma','ik','b']]
         vplots = [['mysoma','v','k']]
         iplots_k = [['mysoma','ik','b']]
@@ -276,12 +296,13 @@ class Experiment_140305:
         if nb>1:
             vplots.append([otherbaseslabels[0],'v','b-'])
         iplots_soma = [['mysoma','ina','g'],['mysoma','ik','b']]
-        pp['plot'] = {1:vplots,
-                      2:vplots_soma,
-                      3:iplots_soma,
-                      4:iplots_k,
-                      5:iplots_na}
-        
+        """
+        pp['plot'] = {1:vplots_soma}
+        """ #2:vplots,
+                      #3:iplots_soma,
+                      #4:iplots_k,
+                      #5:iplots_na}
+        """
         pp['num_threads'] = 1
         if runon:
             #self.es.run_single_experiment(self.expbase, 'cluster', pp)
@@ -292,10 +313,151 @@ class Experiment_140305:
             
             
             
+    def run_collection_generic_highexp(self,pp,tree,irr,factor,whole,other_tag_locations=None,runon=True):
+        nb,nc,nl = tree
+        # neuron model and params
+        pp['cell'] = ['Neuron', 'FractalNeuron']
+        pp['cell_params'] = {'num_base': nb,
+                      'num_split': nc,
+                      'num_levels':nl,
+                      'defaultlevel':{'mechanisms':['pas_dend','hh'],#,'ih','ca_lvast','ca_hva','sk3','ske2','na_tat','ca_dyn','im'],
+                                      'cm':2.,
+                                      'Ra':100},
+                      'soma':{'mechanisms':['pas_soma','hh'],#'ih','ca_lvast','ca_hva','sk3','ske2','ktst','kpst','na_et2','na_tat','ca_dyn'],
+                              'cm':1.},
+                      'dend0':{'mechanisms':['pas_dend','hh'],
+                               'cm':2.,
+                               'Ra':100},
+                      'dend1':{'mechanisms':['pas_dend','hh'],
+                               'cm':2.,
+                               'Ra':100},               
+                      'mechanisms': {'pas_soma':('pas',{'e':-70}),#,'g_pas':1./20}),
+                                     'pas_dend':('pas',{'e':-70})},#,,'g_pas':1./10}),}
+                                     'hh':('hh',),
+                }
+        # opsin
+        show_levels = np.min([nl,5])
+        labels,locs = self.get_dend0_child_locations(show_levels)
+        #print locs
+        #chrdict =  {'exp':5e-4, 'irradiance' :irr, 'pulsewidth': self.light_dur,'lightdelay':self.light_on,'interpulse_interval':250,  'n_pulses':1}
+        #hrdict =  {'exp':5e-4, 'irradiance' :factor*irr, 'pulsewidth': self.light_dur,'lightdelay':self.light_on,'interpulse_interval':250,  'n_pulses':1}
+        chrdict =  {'exp':5, 'irradiance' :irr, 'pulsewidth': self.light_dur,'lightdelay':self.light_on,'interpulse_interval':250,  'n_pulses':1}
+        hrdict =  {'exp':5, 'irradiance' :factor*irr, 'pulsewidth': self.light_dur,'lightdelay':self.light_on,'interpulse_interval':250,  'n_pulses':1}
+        
+        
+        pp['opsindict'] = {}
+        if irr > 0 and whole:
+            print 'Case 1'
+            pp['opsindict']['ChR'] =  {'soma': chrdict}
+            for i in range(nb):
+                pp['opsindict']['ChR']['dend%g'%i] = chrdict
+                
+            pp['opsindict']['NpHR'] =  {'soma': hrdict}
+            for i in range(nb):
+                pp['opsindict']['NpHR']['dend%g'%i] = hrdict
+            pp['NpHR_areas'] = {'whole'      : pp['opsindict']['NpHR'].keys()}
+            pp['ChR_areas'] = {'whole'      : pp['opsindict']['ChR'].keys()}
+        elif irr > 0 and not whole:
+            if nb == 1:
+                print "Does not make sense to run partialSame for trees where nb=1"
+                return
+            print 'Case 2'
             
             
-    def run_collection_intrinsic(self,collection,whole=True):
+            opsin_index = 0
+            
+            pp['opsindict']['ChR'] =  {'soma': chrdict}
+            pp['opsindict']['NpHR'] =  {'soma': hrdict}
+            pp['opsindict']['ChR']['dend%g'%opsin_index] = chrdict
+            pp['opsindict']['NpHR']['dend%g'%opsin_index] = hrdict
+            pp['NpHR_areas'] = {'partialSame':['dend%g'%opsin_index,'soma']}
+            pp['ChR_areas'] = {'partialSame':['dend%g'%opsin_index,'soma']}
+        elif irr==0 and whole:
+            print 'Case 3'
+            pp['NpHR_areas'] = {'none'      : [None]}
+            pp['ChR_areas'] = {'none'      : [None]}
+        else: # irr = 0 and partial only --> so why bother simulating
+            print 'Case 4'
+            return
+        
+        if factor ==0:
+            pp['NpHR_areas'] = {'none'      : [None]}
+            pp['opsindict']['NpHR'] = {}
+        
+        
+        # general settings 
+        pp['experiment_type'] = 'opsinonly'
+        pp['savedata'] = True # False #True
+        
+        pp['tstart'] = 0
+        pp['tstop'] = self.tstop
+        
+        otherbaseslabels,othersections = [],[]
+        if nb > 1:
+            otherbaseslabels = ['dend1']
+            othersections    = ['dend1']
+            
+        if other_tag_locations is not None:
+            obases,olabels,olocs = other_tag_locations
+            #print olocs
+        else:
+            obases,olabels,olocs = [],[],[]
+            
+        #print olocs
+        pp['mark_loc'] = {}
+        pp['mark_loc']['names'] = ['mysoma']+labels+otherbaseslabels+olabels
+        pp['mark_loc']['sections'] = ['soma']+['dend0']*nl+othersections+obases
+        pp['mark_loc']['ids'] = [(0,0.5)] + [('get_section_byname',{'sectioname':loc[0],'subdomain':'dend0'}) for loc in locs]+[('get_section_byname',{'sectioname':loc,'subdomain':'dend1'}) for loc in otherbaseslabels]+[(0,loc[1]) for loc in olocs ]
+        #print pp['mark_loc']['ids']
+        
+        pp['record_loc'] = {}
+        pp['record_loc']['v'] = ['mysoma']+labels+otherbaseslabels
+        #pp['record_loc']['ina'] = ['mysoma']+labels+otherbaseslabels
+        #pp['record_loc']['ik'] = ['mysoma']+labels+otherbaseslabels
+        #pp['record_loc']['ik'] = labels+otherbaseslabels
+        #pp['record_loc']['ica'] = labels+otherbaseslabels
+        
+        
+        vplots_soma = [['mysoma','v','k']]
+        """
+        iplots_soma = [['mysoma','ina','g'],['mysoma','ik','b']]
+        vplots = [['mysoma','v','k']]
+        iplots_k = [['mysoma','ik','b']]
+        iplots_na = [['mysoma','ina','g']]
+        colors = self.get_dendritic_colors(show_levels)
+        for i in range(show_levels):
+            vplots.append([labels[i],'v',colors[i]])
+            iplots_k.append([labels[i],'ik',colors[i]])
+            iplots_na.append([labels[i],'ina',colors[i]])
+        #print vplots
+        if nb>1:
+            vplots.append([otherbaseslabels[0],'v','b-'])
+        iplots_soma = [['mysoma','ina','g'],['mysoma','ik','b']]
+        """
+        pp['plot'] = {1:vplots_soma}
+        """ #2:vplots,
+                      #3:iplots_soma,
+                      #4:iplots_k,
+                      #5:iplots_na}
+        """
+        pp['num_threads'] = 1
+        if runon:
+            #self.es.run_single_experiment(self.expbase, 'cluster', pp)
+            self.es.run_single_experiment(self.expbase, 'missing', pp)
+            
+        else:
+            self.es.run_single_experiment(self.expbase, 'local', pp)
+            
+            
+            
+
+            
+            
+    def run_collection_intrinsic(self,whole=True):
         count = 0
+        collection = self.collection_same_total
+        Ia = 0.1
+        w = 5
         for tree in collection:
             nb,nc,nl = tree
             if nb == 1 and not whole:
@@ -303,19 +465,56 @@ class Experiment_140305:
             for factor in self.factors:
                 for irr in self.irrs: 
                     
-                    
+                    #labels,locs = self.get_dend0_child_locations(nl)
+                    #clamploc = nl-1
                     pp = {}
                     
-                    pp.update({'expname':self.expbase,
-                               'description':'irr%.2f_factor%.2f_nb%g_ns%g_nl%g'%(irr,factor,nb,nc,nl)})
+                    #pp['stim_iclamp_train'] = True
+                    #max_freq = 200
+                    #t_interval = 1000./max_freq
+                    #pp['iclamp_train'] = [{'tstims': np.arange(0.,self.tstop,t_interval),  'location': labels[-1], 'weights':[w],'amp':Ia, 'dur':1.}]
                     
-                    self.run_collection_generic(pp,tree,irr,factor,whole)
+                    
+                    pp.update({'expname':self.expbase,
+                               'description':'irr%.2f_factor%.2f_nb%g_ns%g_nl%g_highExp3'%(irr,factor,nb,nc,nl)})
+                    print pp['description']
+                    self.run_collection_generic_highexp(pp,tree,irr,factor,whole)
                     count += 1
                 
                 
         print '%g jobs submitted'%count
     
-    
+    def run_collection_intrinsic_drive(self,whole=True):
+        count = 0
+        collection = self.collection_same_total
+        Ia = 10.
+        w = 1.
+        for tree in collection:
+            nb,nc,nl = tree
+            if nb == 1 and not whole:
+                continue
+            for factor in self.factors:
+                for irr in self.irrs: 
+                    
+                    labels,locs = self.get_dend0_child_locations(nl-1)
+                    clamploc = nl-1
+                    pp = {}
+                    
+                    pp['stim_iclamp_train'] = True
+                    max_freq = 200
+                    t_interval = 1000./max_freq
+                    pp['iclamp_train'] = [{'tstims': np.arange(0.,self.tstop,t_interval),  'location': labels[-1], 'weights':[w],'amp':Ia, 'dur':1.}]
+                    
+                    
+                    pp.update({'expname':self.expbase,
+                               'description':'irr%.2f_factor%.2f_nb%g_ns%g_nl%g_illDriven'%(irr,factor,nb,nc,nl)})
+                    print pp['description']
+                    self.run_collection_generic(pp,tree,irr,factor,whole)#,runon=False)
+                    return
+                    count += 1
+                
+                
+        print '%g jobs submitted'%count
     
     def run_collection_clamp(self,collection,whole=True):
         
@@ -331,7 +530,7 @@ class Experiment_140305:
                 for irr in self.irrs: 
                     for Ia in self.clamp_amps:
                         
-                        for clamploc in range(show_levels):
+                        for clamploc in [nl-1]: #range(show_levels):
                             
                             labels,locs = self.get_dend0_child_locations(nl)
                             pp = {}
@@ -359,8 +558,6 @@ class Experiment_140305:
         print '%g jobs submitted'%count
 
 
-
-
     def get_spiketimes(self,rate,num_inputs):
         spikes = []
         stg = ntst.StGen()
@@ -379,7 +576,8 @@ class Experiment_140305:
         return labels,locs
         
 
-    def run_collection_spiketrain(self,collection,whole=True):
+    def run_collection_spiketrain(self,whole=True):
+        collection = self.collection_same_total
         nsegs = 10
         stim_interval = 50.
         count = 0
@@ -394,7 +592,7 @@ class Experiment_140305:
                     for freq in self.freqs:
                         for J in self.Js: 
                             
-                            for clamploc in [0]: #,nl-1]: #
+                            for clamploc in [nl-1]:#0]: #,nl-1]: #
                                 ###################################################################
                                 
                                 
@@ -407,7 +605,7 @@ class Experiment_140305:
                                 pp['spiketrains'] = [{'tstims': self.get_spiketimes(freq,nsegs),  'locations': splabels, 'weights':np.ones(nsegs)*J,  'el': 0.02}]
                                 pp.update({'expname':self.expbase,
                                            'description':'irr%.2f_factor%.2f_nb%g_ns%g_nl%g_spikes%g_loc%s_J%.1f'%(irr,factor,nb,nc,nl,freq,clamploc,J)})
-                                
+                                print pp['description']
                                 self.run_collection_generic(pp,tree,irr,factor,whole,other_tag_locations=(spbases,splabels,splocs))#,runon=False)
                                 #return
                                 count += 1

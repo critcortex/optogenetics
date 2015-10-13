@@ -113,12 +113,25 @@ class Experiment_120614:
         
         
         # 150805: rerun
-        self.irrs = [ a*b for a in [0.01, 0.1, 1.] for b in [1,2,5]]
+        self.irrs = [0.0]+[ a*b for a in [0.001,0.01, 0.1, 1.] for b in [1,2,5]]
         self.factors = [0.125,0.25,0.5,1.,1.5,2.,4.,8.]
         self.shuffles = range(1)
         
         self.shuffles = [5]
+    
+    
         
+    def run_bg_firing(self):
+        """
+        Added 13/10/15: sjarvis
+        to check for background firing rates
+        """
+        self.freqs = range(20,101,10)
+        self.irrs = [0.0]
+        self.factors = [0.125]
+        self.shuffles = range(10)
+        self.run_experiments()
+    
     
     
     def run_experiments(self):
@@ -236,8 +249,8 @@ class Experiment_120614:
         
         pp['record_loc'] = {}
         pp['record_loc']['v'] = ['mysoma']#+otherbaseslabels
-        pp['record_loc']['ina'] = ['mysoma']#+otherbaseslabels
-        pp['record_loc']['ik'] = ['mysoma']#+otherbaseslabels
+        #pp['record_loc']['ina'] = ['mysoma']#+otherbaseslabels
+        #pp['record_loc']['ik'] = ['mysoma']#+otherbaseslabels
         
         vplots_soma = [['mysoma','v','k']]
         """
@@ -257,14 +270,14 @@ class Experiment_120614:
         """
         pp['num_threads'] = 1
         
-        
         if runon:
             #self.es.run_single_experiment(self.expbase, 'cluster', pp)
             self.es.run_single_experiment(self.expbase, 'missing', pp)
             
         else:
             self.es.run_single_experiment(self.expbase, 'local', pp)
-       
+
+
     
     def __get_color(self,cmap,value=0.8):
         cNorm = colors.Normalize(vmin=0,vmax=1) 
@@ -509,6 +522,8 @@ if __name__ == '__main__':
         print 'run'
         wholecell,inputtype,celltype,spiketrain_type = sys.argv[2],sys.argv[3],sys.argv[4],sys.argv[5]
         Experiment_120614(wholecell,inputtype,celltype,spiketrain_type).run_experiments()
+    elif sys.argv[1] == 'bg':
+        Experiment_120614('whole','poisson','L5PC','poisson').run_bg_firing()
     else:
         print "Unknown option - ", sys.argv[1]
         

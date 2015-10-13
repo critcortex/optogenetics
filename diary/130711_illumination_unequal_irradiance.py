@@ -17,7 +17,7 @@ runon = 'cluster'
 
 #explist = [['apical','none'],['whole','none']] ,['none','apical'],['none','whole'],['apical','apical'],['whole','whole'],['none','none']]
 explist = [['apical','apical'],['whole','whole']] 
-explist = [['apical','apical'],['whole','whole']] 
+explist = [['whole','whole']] 
 
 
 light_on = 700
@@ -31,12 +31,21 @@ es = run_experiments.ExpSetup()
 areas = es.get_areas_section()
 params = {}
 
+
+# added 05/10/15
+irradiances = [0.002]
+irradiances = [0.02,0.2]
+
+
 def run_experiments():
     for exparea in explist:
         params['ChR_areas'] = {exparea[0]:areas[exparea[0]]}
         params['NpHR_areas'] = {exparea[1]:areas[exparea[1]]}
         
         params['tstop'] = tstop
+        
+        params['cell'] = ['Neuron', 'L5PC']
+        params['cell_params'] = {}
 
         for irr in irradiances:
             for factor in factors:
