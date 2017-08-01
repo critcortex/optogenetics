@@ -9,14 +9,25 @@ import numpy as np
 import collections
 from multiprocessing import Process, Queue, current_process, freeze_support
 
+"""
+ExpEngine : class for modules to handle the running of multiple jobs
+
+
+
+"""
+
+
 class NeuronExperiment():
 
     def main(self, experiment_dict):
         # This is where you would set up the experiment in NEURON i.e. 
         # h.init() 
         # Note that you should put this class in a separate file
-        print("Running an experiment with parameters:")
+        print("Running an experiment with parameters: ----------------")
+        print(experiment_dict['description'])
+        print("-------------------------------------------------------")
         print(experiment_dict)
+        print('=======================================================')
 
 
 
@@ -80,24 +91,7 @@ class ExpSetup():
                 'cell'              : None,
                 'cell_description'  : '',
                 'cell_params'       : {},
-                # optogen params
-                'opsindict'         : {},
-                'NpHR_areas'        : {},
-                'ChR_areas'         : {},
-                'NpHR_times'        : [],
-                'ChR_times'         : [],
-                'description'       : '',
-                # old params that are kept in for compatibility
-                'soma_stim_DC'      : 0., # 1.,
-                'iclamp_amp'        : 0., #1.,
-                'iclamp_start'      : 0., #100.,
-                'iclamp_duration'   : 0., #100.,
-                'iclamp_dist_amp'        : 0., #1.,
-                'iclamp_dist_start'      : 0., #100.,
-                'iclamp_dist_duration'   : 0., #100.,
-                'EPSP_amp'           : 0.0,
-                'EPSP_transient'    : 0., #200.,
-                # and their new, improved counterparts
+                
                 'stim_iclamp'       : False,
                 'iclamp'            : [{'amp':1.,
                                         'tstim':200.,
@@ -111,9 +105,9 @@ class ExpSetup():
                                         'BACdt': 0.,
                                         'location':'soma'}],
                 'stim_spiketrains'  : False,
-                'spiketrains'       : [{'tstims': [[200, 600],[400, 600]], 
-                                       'locations': [['soma', 0.5]], 
-                                       'weights':[1.,1.], 
+                'spiketrains'       : [{'tstims': [[200, 600]], 
+                                       'locations': ['soma'], 
+                                       'weights':[1.], 
                                        'el': 0.02}],
                 'mark_loc'          : {'names':[],'sections':[], 'distances':[],'ids':[]},
                 'record_loc'        : {'v': [],
@@ -217,12 +211,19 @@ class SampleExperiment():
         self.es = ExpSetup()
 
     def test_sample_exp(self):
-	pp = {  'expbase': '150622_test',
-		'description':'testing_workerProcess'}
-	self.es.run_single_experiment(pp['expbase'], 'local', pp)
+        pp = {  'expbase': '150622_test',
+              'description':'testing_workerProcess_singleExp'}
+        self.es.run_single_experiment(pp['expbase'], 'local', pp)
+        
+    def test_multiple_exps(self):
+        for i in range(4):
+            pp = {  'expbase': '150622_test',
+                  'description':'testing_workerProcess_number%g'%i}
+            self.es.run_single_experiment(pp['expbase'], 'local', pp)
 
 
 sampleExp = SampleExperiment()
 sampleExp.test_sample_exp()
+sampleExp.test_multiple_exps()
 
 

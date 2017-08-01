@@ -15,7 +15,7 @@ GROUPSERV_LOC = 'smb://bg-thefarm-2012/schultz_group_data/Jarvis_comptogen_simda
 EXT_HDD = '/media/Seagate Expansion Drive/ic_desktop/git/optogenetics/experiments/%s'
 
 DEFAULT_WALLTIME = 3
-
+EXP_DAT_LOCATION = 'experiments/%s/dat/'
 basedir = 'experiments/%s'
 subfolders = ['img','dat','pkl','out','gdf']
 filemaps = {    '*png' : 'img',
@@ -228,6 +228,40 @@ def saveresults(expdict,filename):
     pickle.dump(expdict, f) 
     print 'Job saved: %s_output.pkl'%filename
     
+    
+def loaddat(expname,basename,modifier='',dattype='v'):
+    
+    try:
+        datfile = EXP_DAT_LOCATION%basename +"%s%s.dat"%(basename+expname,modifier)
+        print 'location =',datfile
+    except:
+        print 'Error with resolving name when finding file'
+        return 
+    gg = glob.glob(datfile)
+    if len(gg)==1:
+        print 'Found it'                    
+        fullname = gg[0][:-4] # name of .dat file without the file extension
+        return gg[0]
+    elif len(gg)==0:
+        #TODO: raise error
+        print 'No file found: ',datfile
+        try:
+            datfile = EXP_DAT_LOCATION%basename +"%s%s_%s.dat"%(basename+expname,modifier,dattype)
+            print 'trying location =',datfile
+            dd = glob.glob(datfile)
+            print dd
+            if len(dd)==1:
+                print 'Found it'
+                fullname = dd[0][:-6] # name of .dat file without the file extension
+                return dd[0]
+            else:
+                print 'Could not find it = '
+        except:
+            print 'Error = ',sys.exc_info()[0] 
+            pass
+    elif len(gg)>1:
+        #TODO: raise error - too many files
+        print 'Too many files found: ',file
     
 def loadspikes(expname,basename):
      

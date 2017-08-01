@@ -1088,8 +1088,11 @@ class NeuronExperiment:
         self.save_data()
         self.printstatus('Running plots')
         self.run_plots()
-        self.printstatus('Saving output')
-        self.save_outputfile()
+        try:
+            self.save_outputfile()
+            self.printstatus('Saving output')
+        except:
+            self.printstatus("Unable to save output")
         self.printstatus('Printing stats')
         self.print_stats()
     

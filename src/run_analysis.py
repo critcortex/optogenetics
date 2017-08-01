@@ -10,6 +10,7 @@ import pickle as pkl
 import itertools
 import NeuroTools.signals  
 import math
+from xdg.Menu import tmp
 
 DEFAULT_FREQ = [0.5,1,1.5,2,2.5,4,5,6,7,8,9,10,15,20,30,35,40,45,50]
 DEFAULT_IRRAD = [1,2,5,10,20,50,100]
@@ -34,7 +35,7 @@ EXP_IMG_LOCATION = 'experiments/%s/img/'
 EXP_PKL_LOCATION = 'experiments/%s/pkl/'
 EXP_GDF_LOCATION = 'experiments/%s/gdf/'
 
-CMAPS = ['jet','YlOrRd','YlGnBu_r','spectral','YlGnBu_r','YlOrRd','GnBu','hsv','CMAP_ORANGE_BLUE','CMAP_BLUE_ORANGE','CMAP_FULL_BLUE_ORANGE','r_pink','hot_r','Paired','rainbow','gist_rainbow']
+CMAPS = ['jet','YlOrRd','YlGnBu_r','spectral','YlGnBu_r','YlOrRd','GnBu','hsv','CMAP_ORANGE_BLUE','CMAP_BLUE_ORANGE','CMAP_FULL_BLUE_ORANGE','r_pink','hot_r','Paired','rainbow','gist_rainbow','PuRd','copper','CMRmap']
 
 
 OPSINS_IPHOTO = {'ChR': False, 
@@ -42,7 +43,7 @@ OPSINS_IPHOTO = {'ChR': False,
              'ArchT': True}
 
 RC_SETTINGS = {'paper': {'lw': 3, 
-                         'lw_fine':1,
+                         'lw_fine':3,
                          'alpha':0.5,
                          'dpi':300,
                          'figure.dpi':300,
@@ -57,8 +58,9 @@ RC_SETTINGS = {'paper': {'lw': 3,
                           'axes.linewidth':2,
                           'dpi':300,
                           'figure.dpi':300,
+                          'figure.figsize' : (8, 6),
                           'savefig.dpi':300,
-                          'lw_fine':2,
+                          'lw_fine':3,
                           'alpha':0.75,
                           'font.size':16,
                           'colors':['r','b','k','g'],
@@ -302,17 +304,44 @@ class AnalyticFrame:
         print "Running analysis for experiment", expname
         """
         
+    def __find_experimentset(self,label):
+        for exp in self.experimentset:
+            if exp.label == label:
+                return exp
         
-    def _calculateModulationIndex(self,mitype='MI'):
+    def _calculateModulationIndex(self,ChRlabel,NpHRlabel,mitype='MI_bg',recalc=False):
         """
         
         @param 
             mitype : MI or MI_bg
         """
+        yintercept = 'MI_yi'
         
-        m_ChR2 = self.experimentset[0].results[mitype][1] #ChR2 max
-        m_NpHR = self.experimentset[-1].results[mitype][0] # NpHR max
-        return m_ChR2/m_NpHR
+        for exp in self.experimentset:
+            exp.run_gradient(recalc=recalc)
+            
+            
+        expChR = self.__find_experimentset(ChRlabel)
+        expNpHR = self.__find_experimentset(NpHRlabel)
+        
+        m_ChR2 = expChR.results[mitype] #ChR2 max
+        m_NpHR = expNpHR.results[mitype] # NpHR max
+        
+        yi_ChR2 = expChR.results[yintercept]
+        yi_NpHR = expNpHR.results[yintercept]
+        
+        if type(m_ChR2) is list:
+            m_ChR2 = m_ChR2[0]
+        if type(m_NpHR) is list:
+            m_NpHR = m_NpHR[0]
+        if type(yi_ChR2) is list:
+            yi_ChR2 = yi_ChR2[0]
+        if type(yi_NpHR) is list:
+            yi_NpHR = yi_NpHR[0]
+        #print "------->>>>>>"
+        #print m_ChR2, m_NpHR
+        #print "------->>>>>>"
+        return m_ChR2,m_NpHR,yi_ChR2,yi_NpHR
         
     def get_analysis_values(self,key):
         """
@@ -397,16 +426,16 @@ class ExperimentPlotter:
         return scalarMap.to_rgba(value)
     
     def __turn_off_border(self,ax,turnoffs=['right','top']):
+        ax.xaxis.set_ticks_position('bottom')
+        ax.yaxis.set_ticks_position('left')
         for loc, spine in ax.spines.iteritems():
             if loc not in turnoffs:
                 spine.set_position(('outward',5))
                 ax.tick_params(direction='out')
             elif loc in turnoffs:
-                #spine.set_color('none') # don't draw spine
+                spine.set_color('none') # don't draw spine
                 spine.set_visible(False)
-                #ax.tick_params([])
-        ax.xaxis.set_ticks_position('bottom')
-        ax.yaxis.set_ticks_position('left')
+                ax.tick_params([])
         
     def plot_FI(self,experimentsets,savefig=None,settings='paper',removeNulls=True):
         pylab.close('all')
@@ -416,7 +445,8 @@ class ExperimentPlotter:
         intensities = np.linspace(0.1, 0.9, len(experimentsets))
 
         for (i,expset) in enumerate(experimentsets):
-            try:
+            #try:
+            if True:
                 print 'i=%g, intensities[i]='%i,intensities[i]
                 print 'exp variables len', len(expset.expvariables[0])
                 print expset.expvariables[0]
@@ -437,7 +467,7 @@ class ExperimentPlotter:
                     pylab.plot(xs[obs:],ys[obs:],lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),label=expset.get_label())
                 else:
                     pylab.plot(expset.expvariables[0],expset.results['FI'],lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),label=expset.get_label())
-            except:
+            #except:
                 print 'Error with plotting for expset', expset
                 continue
         # turn the right and top axes off
@@ -551,76 +581,76 @@ class ExperimentPlotter:
             return [1.,1.,1.,0.]
         
                 
-    def plot_fit_FI(self,experimentsets,savefig=None,settings='poster',polyfn='_poly'):
+    def plot_fit_FI(self,experimentsets,savefig=None,settings='poster',polyfn='_poly',**kwparams):
         
         pylab.close('all')
        
-        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_poly',polyfn='_poly',p0=[1.,1.,1.,0.])
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_poly',polyfn='_poly',p0=[1.,1.,1.,0.],**kwparams)
         pylab.close('all')
         
-        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_sigmoid',polyfn='_sigmoid',p0=None)
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_sigmoid',polyfn='_sigmoid',p0=None,**kwparams)
         pylab.close('all')
         
-        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_linear',polyfn='_linear',p0=None)
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_linear',polyfn='_linear',p0=None,**kwparams)
         pylab.close('all')
        
-        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_log',polyfn='_log',p0=None)
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_log',polyfn='_log',p0=None,**kwparams)
         pylab.close('all')
         
-        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_log_heaviside',polyfn='_log_heaviside',p0=None)
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_log_heaviside',polyfn='_log_heaviside',p0=None,**kwparams)
         pylab.close('all')
        
-        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_power_law',polyfn='_power_law',p0=None)
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_power_law',polyfn='_power_law',p0=None,**kwparams)
         pylab.close('all')
        
-        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_mixed',polyfn=['_poly','_sigmoid','_linear','_log','_log_heaviside','_power_law'],p0=None)
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_mixed',polyfn=['_poly','_sigmoid','_linear','_log','_log_heaviside','_power_law'],p0=None,**kwparams)
         pylab.close('all')
         
-        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_mixed2',polyfn=['_poly','_sigmoid','_linear','_log'],p0=None)
+        self._plot_fit_FI(experimentsets,settings=settings,savefig=savefig+'_mixed2',polyfn=['_poly','_sigmoid','_linear','_log'],p0=None,**kwparams)
         pylab.close('all')
         
         
-    def _plot_fit_FI(self,experimentsets,savefig=None,settings='poster',polyfn='_poly',p0=None):
-        self._plot_fit_FI_general(experimentsets,'expvariables','FI','Input',savefig,settings,polyfn,p0)
+    def _plot_fit_FI(self,experimentsets,savefig=None,settings='poster',polyfn='_poly',p0=None,**kwparams):
+        self._plot_fit_FI_general(experimentsets,'expvariables','FI','Input',savefig,settings,polyfn,p0,**kwparams)
     
     
     
-    def plot_fit_FI_bg(self,experimentsets,savefig=None,settings='poster',polyfn='_poly'):
+    def plot_fit_FI_bg(self,experimentsets,savefig=None,settings='poster',polyfn='_poly',**kwparams):
         
         pylab.close('all')
         
-        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_poly',polyfn='_poly')
+#         self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_poly',polyfn='_poly',**kwparams)
+#         pylab.close('all')
+#         
+#         self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_sigmoid',polyfn='_sigmoid',p0=None,**kwparams)
+#         pylab.close('all')
+#         
+        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_linear',polyfn='_linear',p0=None,**kwparams)
+        pylab.close('all')
+#         
+#         self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_log',polyfn='_log',p0=None,**kwparams)
+#         pylab.close('all')
+#         
+#         self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_log_heaviside',polyfn='_log_heaviside',p0=None,**kwparams)
+#         pylab.close('all')
+#         
+#         self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_power_law',polyfn='_power_law',p0=None,**kwparams)
+#        pylab.close('all')
+        
+        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_mixed',polyfn=['_poly','_sigmoid','_linear','_log','_log_heaviside','_power_law'],p0=None,**kwparams)
         pylab.close('all')
         
-        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_sigmoid',polyfn='_sigmoid',p0=None)
-        pylab.close('all')
-        
-        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_linear',polyfn='_linear',p0=None)
-        pylab.close('all')
-        
-        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_log',polyfn='_log',p0=None)
-        pylab.close('all')
-        
-        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_log_heaviside',polyfn='_log_heaviside',p0=None)
-        pylab.close('all')
-        
-        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_power_law',polyfn='_power_law',p0=None)
-        pylab.close('all')
-        
-        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_mixed',polyfn=['_poly','_sigmoid','_linear','_log','_log_heaviside','_power_law'],p0=None)
-        pylab.close('all')
-        
-        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_mixed2',polyfn=['_poly','_sigmoid','_linear','_log'],p0=None)
+        self._plot_fit_FI_bg(experimentsets,settings=settings,savefig=savefig+'_mixed2',polyfn=['_poly','_sigmoid','_linear','_log'],p0=None,**kwparams)
         pylab.close('all')        
         
         
-    def _plot_fit_FI_bg(self,experimentsets,savefig=None,settings='poster',polyfn='_poly',p0=None):
+    def _plot_fit_FI_bg(self,experimentsets,savefig=None,settings='poster',polyfn='_poly',p0=None,**kwparams):
         if savefig is not None:
             savefig += '_bg'
-        self._plot_fit_FI_general(experimentsets,'FI_bg','FI','Background (Hz)',savefig,settings,polyfn,p0)
+        self._plot_fit_FI_general(experimentsets,'FI_bg','FI','Background (Hz)',savefig,settings,polyfn,p0,**kwparams)
 
 
-    def _plot_xs_ys(self,xs,ys,fittedxs,fittedys,labels,xlabel,savefig=None,settings='poster'):
+    def _plot_xs_ys(self,xs,ys,fittedxs,fittedys,labels,xlabel,savefig=None,settings='poster',figsize=None,ymax=None,ymin=None,xmin=None,xmax=None,**kwparams):
         """
         Params:
             xs        list of arrays for each exp set
@@ -634,7 +664,10 @@ class ExperimentPlotter:
         """
         rcsettings = RC_SETTINGS[settings]
         pylab.rcParams.update(rcsettings)
-        pylab.figure() 
+        if figsize is None:
+            pylab.figure(figsize=rcsettings['figure.figsize'])
+        else:
+            pylab.figure(figsize=figsize)
         print xs, len(xs), '<---------'
         intensities = np.linspace(0.1, 0.9, len(xs))
         m = cm.ScalarMappable(cmap=self.cmap)#cmap=rcsettings['cmaps'][self.cmap_index])
@@ -643,6 +676,7 @@ class ExperimentPlotter:
         m.set_array(intensities)
         
         for (i,x) in enumerate(xs): 
+                print i, len(x), len(ys[i])
                 pylab.scatter(x,ys[i],lw=rcsettings['lw']/2,c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),s=rcsettings['lw']*10,facecolor='none',edgecolor=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]),alpha=0.6)
                 pylab.plot(fittedxs[i],fittedys[i],lw=rcsettings['lw'],c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[i]))
             
@@ -653,9 +687,21 @@ class ExperimentPlotter:
         pylab.xlabel(xlabel)
         
         
+        
+        
         #pylab.ylim(ymin=ys[0]-np.abs(ys[0])*0.1)
         #pylab.ylim(ymax=ys[-1]+np.abs(ys[-1])*0.1)
-        pylab.xlim(xmin=xs[0][0]-np.abs(xs[0][0])*0.15)
+        if ymax is not None:
+            pylab.ylim(ymax=ymax)
+
+        if ymin is not None:
+            pylab.ylim(ymin=ymin)
+            
+            
+        if xmin is None:
+            pylab.xlim(xmin=xs[0][0]-np.abs(xs[0][0])*0.15)
+        else:
+            pylab.xlim(xmin=xmin)
         #pylab.xlim(xmin=0)
         pylab.xlim(xmax=xs[0][-1]+np.abs(xs[0][-1])*0.1)
         
@@ -764,8 +810,21 @@ class ExperimentPlotter:
         
         return best_poly, cparams, polyfn[best_poly_index],[xvals[0],xvals[-1]]
         
+    def _remove_nonentries(self,xs,ys):
+        print "pre ys  = ",ys , type(ys), type(xs)
+        print "lengths = ", len(ys), len(xs)
+        xs = np.array(xs)
+        ys = np.array(ys)
+        inds = ys!=-1
+        xs = xs[inds]
+        ys = ys[inds]
+        print "post ys = ",ys
+        print "lengths = ", len(ys), len(xs)
+        print "*******************************************************************"
+        return tuple(xs),tuple(ys)
+        
 
-    def _plot_fit_FI_general(self,experimentsets,xval_key,yval_key,xlabel,savefig=None,settings='poster',polyfn='_poly',p0=None):
+    def _plot_fit_FI_general(self,experimentsets,xval_key,yval_key,xlabel,savefig=None,settings='poster',polyfn='_poly',p0=None,remove_late_zero=True,**kwparams):
         """
         Does the fitting, and hands over to _plot_xs_ys to do the plotting
         
@@ -814,11 +873,14 @@ class ExperimentPlotter:
                     xvals = xs
                     
                 xs,ys = self._sort_xsys(xs, ys)
+                
+                if remove_late_zero:
+                    xs,ys = self._remove_nonentries(xs,ys)
                 # OLD
-                svals = np.asarray(xvals).ravel() 
+                #svals = np.asarray(xvals).ravel() 
                 # NEW
                 #TODO: change this to the correct - which wshould be xs
-                #svals = np.asarray(xs).ravel() 
+                svals = np.asarray(xs).ravel() 
                 fis = np.asarray(ys).ravel()
                 
                 
@@ -840,9 +902,9 @@ class ExperimentPlotter:
                 
                 
                 # OLD
-                obsxs.append(xvals)
+                #obsxs.append(xvals)
                 # NEW
-                #obsxs.append(svals)
+                obsxs.append(svals)
                 obsys.append(fis)
                 fittedxs.append(fitted_svals)
                 fittedys.append(fitted)
@@ -856,11 +918,20 @@ class ExperimentPlotter:
         #print '--> ',obsxs, fitted
         # if we actually have something to plot
         print "-=-=-=-=-=-"
+        print type(obsxs), type(obsys), type(fittedxs), type(fittedys)
+        if type(obsxs) is list: 
+            obsxs = np.array(obsxs)
+        while len(obsxs.shape) >2 :
+            print obsxs
+            obsxs = obsxs[0]
+        print type(obsxs), type(obsys), type(fittedxs), type(fittedys)
+        print "-=-=-=-=-=-"
         print obsxs
         print obsys
+        print len(obsxs), len(obsys)
         print "-=-=-=-=-=-"
         if len(labels)>0:    
-            self._plot_xs_ys(obsxs, obsys, fittedxs, fittedys, labels, xlabel, savefig, settings)
+            self._plot_xs_ys(obsxs, obsys, fittedxs, fittedys, labels, xlabel, savefig, settings,**kwparams)
             
             
             
@@ -942,25 +1013,49 @@ class ExperimentPlotter:
             pylab.savefig(figname)
             print 'Saved figure as %s'%figname
         """
+    def __trim_trace(self,ts,vm,tstart=0,tstop=-1,**kwparams):
+        # tstart set
+        cond = ts>=tstart
+        vm = vm[cond]
+        ts = ts[cond]
+        if tstop>-1:
+            # tstop set
+            cond = ts<=tstop
+            vm = vm[cond]
+            ts = ts[cond]
+            
+        return ts,vm
 
-    def plot_IClamp(self,experimentsets,savefig=None,settings='paper'):
+    def plot_IClamp(self,experimentsets,savefig=None,settings='poster',scalebar=True,turnoffs=['right','top','left','bottom'],figsize=None,scalesizex=25,scalesizey=50,ymin=None,ymax=None,**kwparams):
         """
         Plots soma voltages of multiple experiments onto same figure
         """
         rcsettings = RC_SETTINGS[settings]
         for (i,expset) in enumerate(experimentsets):
             pylab.close('all')
-            pylab.figure() 
+            if figsize is None:
+                pylab.figure(figsize=rcsettings['figure.figsize'])
+            else:
+                pylab.figure(figsize=figsize)
             intensities = np.linspace(0.1, 0.9, len(expset.experiments))
+            
             for (j,exp) in enumerate(expset.experiments):
                 (ts,vsoma) = exp.get_voltage_trace()
+                ts,vsoma= self.__trim_trace(ts,vsoma,**kwparams)
                 print 'j=%g, intensities[i]='%j,intensities[j],' .................',
                 print exp
                 pylab.plot(ts,vsoma,lw=rcsettings['lw_fine'],c=self.__get_color(rcsettings['cmaps'][self.cmap_index],intensities[j]),alpha=rcsettings['alpha'])
-            self.__turn_off_border(pylab.gca())
+            # prettification
+            self.__turn_off_border(pylab.gca(),turnoffs)
             pylab.xlabel('time (ms)')
             pylab.ylabel('v_soma (mV)')
-            
+            if ymin is not None:
+                pylab.ylim(ymin=ymin)
+            if ymax is not None:
+                pylab.ylim(ymax=ymax)
+            if scalebar:
+                self.add_scalebar(pylab.gca(),loc=4,labelx='%gms'%scalesizex,labely='%gmV'%scalesizey,sizex=scalesizex,sizey=scalesizey,matchx=False,matchy=False)
+  
             
             if savefig is not None:
                 figname = '%s_voltage_trace_%s_expset%g.png'%(savefig,time.strftime('%y%m%d'),i)
@@ -1363,7 +1458,36 @@ class ExperimentPlotter:
             
         
         
+    def add_scalebar(self,ax, matchx=True, matchy=True, hidex=True, hidey=True, **kwargs):
+        """ Add scalebars to axes
+        Adds a set of scale bars to *ax*, matching the size to the ticks of the plot
+        and optionally hiding the x and y axes
+        - ax : the axis to attach ticks to
+        - matchx,matchy : if True, set size of scale bars to spacing between ticks
+                        if False, size should be set using sizex and sizey params
+        - hidex,hidey : if True, hide x-axis and y-axis of parent
+        - **kwargs : additional arguments passed to AnchoredScaleBars
+        Returns created scalebar object
+        """
+        def f(axis):
+            l = axis.get_majorticklocs()
+            return len(l)>1 and (l[1] - l[0])
+        
+        if matchx:
+            kwargs['sizex'] = f(ax.xaxis)
+            kwargs['labelx'] = str(kwargs['sizex'])
+        if matchy:
+            kwargs['sizey'] = f(ax.yaxis)
+            kwargs['labely'] = str(kwargs['sizey'])
+            
+        sb = AnchoredScaleBar(ax.transData, **kwargs)
+        ax.add_artist(sb)
     
+        if hidex : ax.xaxis.set_visible(False)
+        if hidey : ax.yaxis.set_visible(False)
+    
+        return sb
+
     """   
         
     def _old_plot_fit_FI(self,experimentsets,savefig=None,settings='poster',polyfn='_poly',p0=None):
@@ -1578,7 +1702,8 @@ class ExperimentSet:
         print analysis_params
 
         if type(exp_params) is not list:
-            print 'Error'
+            print 'Error with populating experiments --> exp_params is not a list '
+            print(exp_params)
             return
 
         if type(exp_params[0]) is list or type(exp_params[0]) is np.ndarray:
@@ -1596,6 +1721,7 @@ class ExperimentSet:
                 self.experiments.append(Experiment(self.basename ,self.subselect%v,analysis_params,vals=v))
         except:
             for v in list(itertools.product(self.expvariables)):
+                print '-----------------------------'
                 print v
                 print self.subselect
                 print self.subselect%v
@@ -1629,28 +1755,73 @@ class ExperimentSet:
             exp.calculate_results(analysis_fns, recalc)
             exp.save_results()
     
-    def run_gradient(self,eval_x=None):
+    def run_gradient(self,eval_at_x=None,recalc=False):
         # calculate experimentset values
-        self.get_datafit()
+        self.get_datafit(eval_at_x=eval_at_x,recalc=recalc)
         
-    def get_datafit(self):
-        # Try all type of curve to get best fit for injected and bg
-        self.results['MI'] = self._get_modulationIndex('expvariables','FI')
-        try:
-            self.results['MI_bg'] = self._get_modulationIndex('FI_bg','FI')
-        except:
-            pass
-        
+    def get_datafit(self,eval_at_x=None,recalc=False):
+        """
+        if not recalc and self.results.has_key('MI'):
+            print 'Results for %s already exists'%'MI' 
+                
+        else: 
+            self.results['MI'] = self._get_modulationIndex('expvariables','FI',eval_at_x)
+        """ 
+        if not recalc and self.results.has_key('MI_bg'):
+            print 'Results for %s already exists'%'MI' 
+        else:   
+            # Try all type of curve to get best fit for injected and bg
+            #try:
+            m_index,y_intercept = self._get_modulationIndex('FI_bg','FI',eval_at_x)
+            self.results['MI_bg'] = m_index
+            self.results['MI_yi'] = y_intercept
+            #except:
+            #    pass
+        for exp in self.experiments:
+            exp.results['MI_bg'] = self.results['MI_bg']
+            exp.results['MI_yi'] = self.results['MI_yi']
     
     
     def _find_nearest(self,array,value):
         return (np.abs(array-value)).argmin()
         
     
-    def _get_modulationIndex(self,fit_key,yval_key,eval_at_x=None):
+    def _get_modulationIndex(self,fit_key,yval_key,eval_at_x=None,fitting_fns=['_linear']):
         
         ep = ExperimentPlotter()
         
+        ys = self.get_property(yval_key)
+                
+        if fit_key == 'expvariables':
+            # need to take the first expvariables value ... sigh. Such a good reminder to plan first, code second
+            # TODO : is there a better way to grab the xvals for this scenario
+            xitem = self.get_property(fit_key)
+            print xitem
+            if type(xitem) is int or type(xitem) is float: 
+                print "uhhuh - got an int/float"
+            elif type(xitem[0]) is int or type(xitem[0]) is float:
+                print "gotta list - good"
+                xs = xitem
+            else:
+                xs = xitem[0]
+            #xs = expset.get_property(xval_key,0)
+            print xs
+            xvals = np.linspace(xs[0], xs[-1],num=len(xs)) 
+        else:
+            xs = self.get_property(fit_key)
+            xvals = xs
+            
+        xs,ys = ep._sort_xsys(xs, ys)
+        
+        xs,ys = ep._remove_nonentries(xs,ys)
+        # OLD
+        #svals = np.asarray(xvals).ravel() 
+        # NEW
+        #TODO: change this to the correct - which wshould be xs
+        svals = np.asarray(xs).ravel() 
+        fis = np.asarray(ys).ravel()
+        
+        """
         ys = self.get_property(yval_key)
         
         if fit_key == 'expvariables':
@@ -1665,36 +1836,23 @@ class ExperimentSet:
             
         svals = np.asarray(xvals).ravel()
         fis = np.asarray(ys).ravel()
-        
-        fitted_xvals = np.linspace(xvals[0], xvals[-1],num=len(xs)*4) # add more data points
-        fitted_svals = np.asarray(fitted_xvals).ravel() 
+        """
         
         # find the best fit
-        poly,popt_curve,pname = ep._fit_curve(svals, fis,p0=None,polyfn=['_sigmoid','_poly'])
+        poly,popt_curve,pname,_ = ep._fit_curve(svals, fis,p0=None,polyfn=fitting_fns)
         #fittedys = poly(fitted_svals,popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3])
         # grab the derivative of the best fit
         d_poly = ep.get_derivative(pname)
-        fitted_dys = d_poly(fitted_svals,popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3])
-        """
-        pylab.figure()
-        pylab.plot(fitted_svals,fittedys)
-        pylab.scatter(svals,fis)
-        pylab.savefig('original_%s_%g_%g_%g_%g.png'%(pname,popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3]))
-        
-        pylab.figure()
-        pylab.plot(fitted_svals,fitted_dys)
-        pylab.savefig('derivative_%s_%g_%g_%g_%g.png'%(pname,popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3]))
-        pylab.close('all')
-        
-        print type(fitted_dys),'------------------------------- %s when calculated on xs[0], xs[-1]=('%(pname),xvals[0], xvals[-1],') are',[fitted_dys.min(),fitted_dys.max()]
-        print "fittedys = ",fitted_dys.min(),fitted_dys.max(),fittedys
-        """
-        # and find the min, max values
         if eval_at_x is None:
-            return [fitted_dys.min(),fitted_dys.max()]
-        else:
-            # TODO: find x index and corresponding t
-            return fitted_dys[self._find_nearest(fitted_svals, eval_at_x)]
+            eval_at_x = (xs[-1] -  xs[0])/2
+        
+        # get gradient at eval_at_x
+        m_at_x = d_poly([eval_at_x],popt_curve[0],popt_curve[1],popt_curve[2],popt_curve[3])
+        print "M at X is ",m_at_x
+        
+        # return gradient and the y-intercept (to be used for calculating the x-intercept)
+        return m_at_x, popt_curve[1]
+        
     
     def calculate_responses(self,key,recalc=False):
         print 'calculate responses', key
@@ -1818,6 +1976,13 @@ class TrialExperimentSet:
     def calculate_responses(self,key,recalc=False):
         for expset in self.experimentsets:
             expset.calculate_responses(key,recalc=False)
+            
+    def run_analysis(self,key,recalc=False):
+        print 'in expset = ', key
+        for expset in self.experimentsets:
+            print 'About to run analysis for ',str(expset)
+            expset.run_analysis(key, recalc)
+            expset.save_experiments()
     
     
     def collate_results(self):
@@ -2121,6 +2286,8 @@ class Experiment:
             if len(spikes)==0:
                 print 'No spikes observed during entire duration'
                 self.results[field] = 0
+                self.results['cv_'+field] = -1
+                self.results['ff_'+field] = -1
                 return 0
             spikes = np.where((spikes >= tstart) & (spikes <= tstop))[0]
             
@@ -2254,8 +2421,8 @@ class Experiment:
     def process_spiketimes(self,**params):
         
         
-        #try:
-        if True:
+        try:
+        #if True:
             print 'Am going to check if spike file exists ...'
             if self._check_spikefile_exists():
                 print 'File already exists'
@@ -2268,9 +2435,9 @@ class Experiment:
             # we want to have all spikes, not just the ones in our area of analysis
             self.save_spikes(spikes)
             return spikes
-        #except:
+        except:
             print "Unexpected error:", sys.exc_info()[0]
-            #pass #
+            pass #
     
     def extract_spiketimes(self,times,v_soma):
         """
@@ -2287,4 +2454,45 @@ class Experiment:
             
             return times[above][take]
         
+
+# taken from https://gist.github.com/dmeliza/3251476
+
+from matplotlib.offsetbox import AnchoredOffsetbox
+class AnchoredScaleBar(AnchoredOffsetbox):
+    def __init__(self, transform, sizex=0, sizey=0, labelx=None, labely=None, loc=4,
+                 pad=0.1, borderpad=0.1, sep=2, prop=None, **kwargs):
+        """
+        Draw a horizontal and/or vertical  bar with the size in data coordinate
+        of the give axes. A label will be drawn underneath (center-aligned).
+        - transform : the coordinate frame (typically axes.transData)
+        - sizex,sizey : width of x,y bar, in data units. 0 to omit
+        - labelx,labely : labels for x,y bars; None to omit
+        - loc : position in containing axes
+        - pad, borderpad : padding, in fraction of the legend font size (or prop)
+        - sep : separation between labels and bars in points.
+        - **kwargs : additional arguments passed to base class constructor
+        """
+        from matplotlib.patches import Rectangle
+        from matplotlib.offsetbox import AuxTransformBox, VPacker, HPacker, TextArea, DrawingArea
+        bars = AuxTransformBox(transform)
+        
+        #print("Testing in here!")
+        if sizex:
+            bars.add_artist(Rectangle((0,0), sizex, 0, fc="none"))
+        if sizey:
+            bars.add_artist(Rectangle((0,0), 0, sizey, fc="none"))
+
+        if sizex and labelx:
+            #print("Testing in here! VPacker")
+            bars = VPacker(children=[bars, TextArea(labelx, minimumdescent=False)],
+                           align="center", pad=0, sep=sep)
+        if sizey and labely:
+            bars = HPacker(children=[TextArea(labely), bars],
+                            align="center", pad=0, sep=sep)
+
+        AnchoredOffsetbox.__init__(self, loc, pad=pad, borderpad=borderpad,
+                                   child=bars, prop=prop, frameon=False, **kwargs)
+
+
+
 
