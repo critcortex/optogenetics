@@ -2,7 +2,7 @@
 %
 % Finds distal location to inject current in
 %
-function [BI_values,OT_values,BC_values,figh] = plot_electrotonic(tree,nb,nc,nl,inj_curr,background_curr,options)
+function [BI_values,OT_values,BC_values,figh] = plot_electrotonic_partial(tree,nb,nc,nl,inj_curr,background_curr,partial_branches,options)
     
 
 
@@ -14,7 +14,11 @@ function [BI_values,OT_values,BC_values,figh] = plot_electrotonic(tree,nb,nc,nl,
         background_curr = 0;
     end
     
-    if (nargin<7)||isempty(options),
+    if (nargin<7)||isempty(partial_branches),
+        partial_branches = 1:nc;
+    end
+    
+    if (nargin<8)||isempty(options),
         options = '';
     end
 
@@ -45,16 +49,29 @@ function [BI_values,OT_values,BC_values,figh] = plot_electrotonic(tree,nb,nc,nl,
     % note that the connecting node for soma is always the even number
     % (also note that this usually is 2, but not guaranteed)
     soma_node = find(tree.R==find(ismember(tree.rnames,'soma')));
-    soma_node = soma_node(end);
+    soma_node_end = soma_node(end);
     
     % Set of Vm for injecting at BI
-    input = background_curr*ones(size (dists, 1), 1);
+    input = zeros(size (dists, 1), 1);
+    for i = 1:size(partial_branches,2),
+        refString = sprintf('dend%u',partial_branches(i)-1); %as we start with dend0 rather than dend1
+        index = strfind(tree.rnames,refString);
+        index = find(~cellfun(@isempty,index));
+        index = ismember(tree.R,index);
+        input(index) = 1;
+    end
+    % and set the soma to receive photocurrents too
+    % input(soma_node) = 1;
+    % now set the photocurrent to be it's chosen value
+    input = background_curr*input;
+    % add extra current for injection site
     input(BI_node) = inj_curr+background_curr;
+    % and finally, calculate the value in response
     sse = sse_tree(tree,input);
     
     % 1. Obtain SSE response for injecting current at BT, for points along
     % path
-    sect = [soma_node BI_node];
+    sect = [soma_node_end BI_node];
     % following line: taken from TREES toolbox, plotsect_tree.m
     indy = ipar  (sect (1, 2), 1 : find (ipar (sect (1, 2), :) == sect (1, 1)));
     indy = fliplr(indy);
@@ -74,7 +91,7 @@ function [BI_values,OT_values,BC_values,figh] = plot_electrotonic(tree,nb,nc,nl,
         % find the section that is the terminating section
         OT_node = intersect(OT_node,term_nodes);
         
-        sect = [soma_node OT_node];
+        sect = [soma_node_end OT_node];
         % following line: taken from TREES toolbox, plotsect_tree.m
         indy = ipar  (sect (1, 2), 1 : find (ipar (sect (1, 2), :) == sect (1, 1)));
         indy = fliplr(indy);
@@ -97,7 +114,7 @@ function [BI_values,OT_values,BC_values,figh] = plot_electrotonic(tree,nb,nc,nl,
             % find the section that is the terminating section
             BC_node = intersect(BC_node,term_nodes);
             
-            sect = [soma_node BC_node];
+            sect = [soma_node_end BC_node];
             
             % following line: taken from TREES toolbox, plotsect_tree.m
             indy = ipar  (sect (1, 2), 1 : find (ipar (sect (1, 2), :) == sect (1, 1)));
