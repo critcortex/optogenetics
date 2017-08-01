@@ -60,12 +60,14 @@ factors = [0.125,0.25,0.5,1.,2.,4.,8.]
 
 
 #irrs = [0.01,0.02]
-irrs = [0.001,0.002]
+#irrs = [0.001,0.002]
+irrs = [1.0,0.002]
 
 # update 05/10/15
 iclamp_amps =[0]
 factors = [0.001,0.125,0.25,0.5,0.75,1.,1.5,2.]
-factors = [0.5]
+#factors = [0.5]
+factors = [0.125,0.25,0.5,1.,2.,4.,8.]+[0.001,0.75]
 
 def get_spiketimes(rate,num_inputs):
     spikes = []
@@ -369,7 +371,8 @@ def scan_locations_optogen_invitro_iPhoto(stimloc):
     
     
     """
-    #iclamp_amps = [0]
+    iclamp_amps = [0]
+    tstop = 3000
     count = 0
 
     for factor in factors:
@@ -415,7 +418,7 @@ def scan_locations_optogen_invitro_iPhoto(stimloc):
                 pp['savedata'] = True # False #True
                 
                 pp['tstart'] = 0
-                pp['tstop'] = 1500 #tstop
+                pp['tstop'] = tstop
                 
                 nsites = 1
                 labels = ['stim%g'%i for i in range(2*nsites)]
@@ -460,10 +463,11 @@ def scan_locations_optogen_invitro_iPhoto(stimloc):
                            'description':'irr%.3f_factor%.2f_I%.2f_stimloc_%s_iPhotoRec'%(irr,factor,Ia,stimloc)})
     
                 #es.run_single_experiment(expbase, 'missing', pp)
-                es.run_single_experiment(expbase, 'local', pp)
+                #es.run_single_experiment(expbase, 'local', pp)
+                es.run_single_experiment(expbase, 'cluster', pp)
                 #es.run_single_experiment(expbase, 'names', pp)
                 count += 1
-                return
+                #return
                 
             """
                 
@@ -730,6 +734,56 @@ def analyse_factors_invitro():
         af.submenu_plot(10, expbase+'FI_gain_varyFactor_invitro_irr%g'%irr)
        
     
+def analyse_photocurrent(stimloc):
+    
+    """
+    Added function on 06/10/15 to try and record photocurrents for 
+    iChR and iNpHR
+    
+    
+    
+    """
+    iclamp_amps = [0]
+    tstop = 3000
+    count = 0
+    
+    for irr in irrs:
+        af = run_analysis.AnalyticFrame()
+    
+        af.update_params({'tstart':light_on,'tstop':light_on+light_dur,
+                              'tstart_bg': 50,'tstop_bg':light_on,
+                              'tstart_post':light_on+light_dur,'tstop_post':tstop})
+        
+        exp_comp_list = [['irr%.3f_'%irr+'factor%.2f_'%f+'I%.2f'+'_stimloc_%s'%stimloc+'_iPhotoRec_NpHR_%s_ChR_%s'%(get_optdescript(irr,f)[1],get_optdescript(irr,f)[0]),'%.2f'%f] for f in factors]
+        print exp_comp_list
+  
+        expss = [ec[0] for ec in exp_comp_list]
+        explabels = [ec[1] for ec in exp_comp_list]
+        print explabels
+        
+        af.populate_expset(expbase,expss,explabels, [iclamp_amps])
+        
+        
+        af.submenu_extractSpikes()
+        
+        af.submenu_print()
+        
+        
+        af.submenu_runFI()
+        for exp in af.experimentset:
+            exp.calculate_responses('FI')
+            exp.calculate_responses('FI_bg')
+            exp.calculate_responses('FI_post')
+            #return
+        af.submenu_save()
+        af.submenu_print()
+        
+        
+        af.submenu_plot(5, expbase+'FI_gain_varyFactor_invitro_irr%g'%irr)
+        af.submenu_plot(0, expbase+'FI_gain_varyFactor_invitro_irr%g'%irr)
+        af.submenu_plot(10, expbase+'FI_gain_varyFactor_invitro_irr%g'%irr)
+        
+
     
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
@@ -751,4 +805,5 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'analyse_vitro_irrs':
         analyse_factors_invitro()
                                             
-scan_locations_optogen_invitro_iPhoto('stim0')                           
+#scan_locations_optogen_invitro_iPhoto('stim0')    
+analyse_photocurrent('stim0')                       

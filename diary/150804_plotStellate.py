@@ -24,6 +24,7 @@ for x, z in cellStell.get_idx_polygons():
     zips.append(zip(x, z))
 
 polycol = PolyCollection(zips,
+                          linewidths=2,
                          edgecolors='black',
                          facecolors='black')
 
@@ -34,4 +35,5 @@ ax.add_collection(polycol)
 ax.axis(ax.axis('equal'))
 
 pylab.savefig("Fig3A_plotStellate.png",dpi=300)
+pylab.savefig("Fig3A_plotStellate.svg",dpi=300)
 

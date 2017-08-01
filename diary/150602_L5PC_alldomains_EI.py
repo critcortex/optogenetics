@@ -19,6 +19,7 @@ import math
 
 expbase = '150602_L5PC_alldomains_EI'
 
+expbase = 'test'
 
 stg = ntst.StGen()
 es = ExpSetup()
@@ -185,6 +186,7 @@ def scan_locations_optogen_invivo():
                     
                                 #print J,2*nsites,2*nInh,Ji, g, ei_ratio, inh_correction
                                 es.run_single_experiment(expbase, 'missing', pp)
+                                return 
                                 #es.run_single_experiment(expbase, 'names', pp)
                                 count += 1
                                 #print pp

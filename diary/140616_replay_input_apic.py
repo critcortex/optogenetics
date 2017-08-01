@@ -119,20 +119,65 @@ class Experiment_120614:
         
         self.shuffles = [5]
     
-    
+    def set_bg(self):
+        #self.freqs = range(20,101,10)
+        self.freqs = range(110,301,10)
+        self.irrs = [0.0]
+        self.factors = [0.125]
+        self.shuffles = range(10)
+        self.explist = ['none','none']
         
     def run_bg_firing(self):
         """
         Added 13/10/15: sjarvis
         to check for background firing rates
         """
-        self.freqs = range(20,101,10)
-        self.irrs = [0.0]
-        self.factors = [0.125]
-        self.shuffles = range(10)
+        self.set_bg()
         self.run_experiments()
+        
+    def analyse_bg(self):
+        """
+        Added 02/11/15: sjarvis
+        to check for analse firing rates
+        """
+        self.set_bg()
+        self.analyse_missing_gdf() #analyse()
     
-    
+    def set120(self):
+        # chosen as it gives normal firing rate of 10Hz
+        self.freqs = [120]
+        self.irrs = [0.0]+[ a*b for a in [0.001,0.01, 0.1, 1.] for b in [2,7]]
+        self.factors = [0.125,0.25,0.5,1.,1.5,2.,4.,8.]
+        self.shuffles = [5]
+        
+    def run120(self):
+        self.set120()
+        self.run_experiments()
+        
+        
+    def run220(self):
+        # chosen as it gives normal firing rate of 15Hz
+        self.freqs = [220]
+        self.irrs = [ a*b for a in [0.001,0.01, 0.1, 1.] for b in [2,7]]
+        self.factors = [0.125,0.25,0.5,1.,1.5,2.,4.,8.]
+        self.shuffles = [5]
+        self.run_experiments()
+        
+    def run80(self):
+        # chosen as it gives normal firing rate of 15Hz
+        self.freqs = [80]
+        self.irrs = [ a*b for a in [0.001,0.01, 0.1, 1.] for b in [2,7]]
+        self.factors = [0.125,0.25,0.5,1.,1.5,2.,4.,8.]
+        self.shuffles = [5]
+        self.run_experiments()
+        
+    def runFreq(self,freqValue):
+        self.freqs = [freqValue]
+        self.irrs = [ a*b for a in [0.001,0.01, 0.1, 1.] for b in [2]]
+        self.factors = [0.125,0.25,0.5,1.,1.5,2.,4.,8.]
+        self.shuffles = [5]
+        self.run_experiments()
+        
     
     def run_experiments(self):
         count = 0
@@ -249,8 +294,11 @@ class Experiment_120614:
         
         pp['record_loc'] = {}
         pp['record_loc']['v'] = ['mysoma']#+otherbaseslabels
+        pp['record_loc']['iChR'] = ['mysoma']
+        pp['record_loc']['iNpHR'] = ['mysoma']
         #pp['record_loc']['ina'] = ['mysoma']#+otherbaseslabels
         #pp['record_loc']['ik'] = ['mysoma']#+otherbaseslabels
+        
         
         vplots_soma = [['mysoma','v','k']]
         """
@@ -389,6 +437,7 @@ class Experiment_120614:
             
             af.submenu_extractSpikes()
         
+        
     def analyse_missing_gdf(self):
         print self.expbase+'*.dat'
         datfiles = glob.glob('experiments/%s/dat/%s*.dat'%(self.expbase,self.expbase))
@@ -504,6 +553,12 @@ class Experiment_120614:
 
 
 ####################################################################################
+"""
+ex = Experiment_120614('whole','poisson','L5PC','poisson')
+ex.set_bg()
+ex.generate_spike_files()
+"""
+
 if __name__ == '__main__':
     print sys.argv
     print sys.argv[1]
@@ -524,6 +579,19 @@ if __name__ == '__main__':
         Experiment_120614(wholecell,inputtype,celltype,spiketrain_type).run_experiments()
     elif sys.argv[1] == 'bg':
         Experiment_120614('whole','poisson','L5PC','poisson').run_bg_firing()
+    elif sys.argv[1] == 'abg':
+        Experiment_120614('whole','poisson','L5PC','poisson').analyse_bg()
+    elif sys.argv[1] == 'run120':
+        Experiment_120614('whole','poisson','L5PC','poisson').run120()
+    elif sys.argv[1] == 'run220':
+        Experiment_120614('whole','poisson','L5PC','poisson').run220()  
+    elif sys.argv[1] == 'run80':
+        Experiment_120614('whole','poisson','L5PC','poisson').run80()           
     else:
         print "Unknown option - ", sys.argv[1]
-        
+
+#Experiment_120614('whole','poisson','L5PC','poisson').runFreq(100)
+#Experiment_120614('whole','poisson','L5PC','poisson').runFreq(160)
+Experiment_120614('whole','poisson','L5PC','poisson').runFreq(140)
+Experiment_120614('whole','poisson','L5PC','poisson').runFreq(200)
+Experiment_120614('whole','poisson','L5PC','poisson').runFreq(180)

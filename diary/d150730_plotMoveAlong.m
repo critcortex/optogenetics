@@ -2,6 +2,7 @@ clear all
 close all
 
 EXPNAME = '_d150209_analyseTreesProximalXX';
+EXPNAME = '_d150209_analyseTreesProximalXX_retest160106';
 
 start_trees
 

@@ -3,7 +3,6 @@ close all
 
 EXPNAME = '_d150129_analyseTrees';
 
-PREFIX = 'smallDend';
 % load style
 cssname = 'default_paper';
 
@@ -42,7 +41,7 @@ trees_config = [[1 1 124]; [1 2 7]; [1 3 5]; [1 123 2]; [2 1 62]; [2 2 6]; ...
     [25 1 5]; [25 4 2]; [31 1 4]; [31 3 2]; [41 1 3]; [41 2 2]; [42 1 3]; ...
     [42 2 2]; [62 1 2]];
 
-trees_config = [[2 61 2]]; %[1 1 124]; [1 2 7]; [2 2 6] ; [4 1 31];];
+trees_config = [[1 1 124]; [1 2 7]; [2 2 6] ; [4 1 31];];
 
 plot_show = '';
 if PLOT_INDIV,
@@ -50,6 +49,7 @@ if PLOT_INDIV,
 end
 
 global trees
+global resampled_trees
 
 data = {};
 
@@ -64,6 +64,8 @@ for i = 1:size(trees_config,1),
     trees{i} = tt;
     resample_tree(i,1,'-d');
     analyse_tree(fname,i);
+      
+    
 %     [a,b,c,figh] = plot_electrotonic(trees{i},t(1),t(2),t(3),INJ_AMOUNT,0,plot_show);
 %     if PLOT_INDIV,
 %         title(gca,sprintf('Inj=1 for I_{photo} = 0 in tree (%g,%g,%g)',t(1),t(2),t(3)));
@@ -77,19 +79,19 @@ for i = 1:size(trees_config,1),
     end
     
     % photocurrent values to be tested
-    for curr = 0.001:0.001:0.005, % 0.005:0.005, %
+    for curr =0.01:0.01:0.05, % 0.005:0.005, % 
         
-        % when we have interaction between injected (evoked) amount and
-        % background (photocurrent) for photoactive and photoinhibition
-        % [a1,b1,c1,figh1] = plot_electrotonic(trees{i},t(1),t(2),t(3),INJ_AMOUNT,-1*curr,plot_show);
-        % [a2,b2,c2,figh2] = plot_electrotonic(trees{i},t(1),t(2),t(3),INJ_AMOUNT,curr,plot_show);
+%         % when we have interaction between injected (evoked) amount and
+%         % background (photocurrent) for photoactive and photoinhibition
+        [a1,b1,c1,figh1] = plot_electrotonic(trees{i},t(1),t(2),t(3),INJ_AMOUNT,-1*curr,plot_show);
+        [a2,b2,c2,figh2] = plot_electrotonic(trees{i},t(1),t(2),t(3),INJ_AMOUNT,curr,plot_show);
         % when we have intrinsic background (photocurrent) for photoactive and photoinhibition
         [a3,b3,c3,figh3] = plot_electrotonic(trees{i},t(1),t(2),t(3),0,-1*curr,plot_show);
         [a4,b4,c4,figh4] = plot_electrotonic(trees{i},t(1),t(2),t(3),0,curr,plot_show);
         % when only a single distal injection
-        [a5,b5,c5,figh5] = plot_electrotonic(trees{i},t(1),t(2),t(3),INJ_AMOUNT,0,plot_show);
+        %[a5,b5,c5,figh5] = plot_electrotonic(trees{i},t(1),t(2),t(3),INJ_AMOUNT,0,plot_show);
         
-        
+                
 %         if curr == 0.005,
 %            data{i}.name = t;
 %            data{i}.vm_max_evoked = a1;
@@ -122,35 +124,35 @@ for i = 1:size(trees_config,1),
 %             %saveas(figh4,sprintf('%s%s_noInj_electrotonic_i%g.png',fname,EXPNAME,curr),'png');
 %             print(sprintf('%s%s_noInj_electrotonic_i%g.png',fname,EXPNAME,curr),'-dpng','-r300');
             
-            figure(figh5);
-            figValues(figh5);
-            name = sprintf('%s%s_Inj_noElectrotonic_i%g_%s',fname,EXPNAME,curr,PREFIX);
-            %title(gca,sprintf('Injected current I=1 in tree (%g,%g,%g)',t(1),t(2),t(3)));
-            saveas(figh5,sprintf('%s_2.png',name),'png');
-            export_fig(sprintf('%s.png',name));
-            export_fig(sprintf('%s.eps',name));
+%             figure(figh5);
+%             figValues(figh5);
+%             name = sprintf('%s%s_Inj_noElectrotonic_i%g',fname,EXPNAME,curr);
+%             %title(gca,sprintf('Injected current I=1 in tree (%g,%g,%g)',t(1),t(2),t(3)));
+%             saveas(figh5,sprintf('%s_2.png',name),'png');
+%             export_fig(sprintf('%s.png',name));
+%             export_fig(sprintf('%s.eps',name));
   
 %             close(figh1);
 %             close(figh2);
 %             close(figh3);
 %             close(figh4);
-             close(figh5);
+%             close(figh5);
         end
 
         
         if PLOT_SUMMARY,
-            line_factor = 1000;
+            line_factor = 100;
             curr*line_factor
             
-%             figure(fig_inj);
-%             hold on;
-%             plot(a1.dists/max(a1.dists),a1.vm,'LineWidth',curr*line_factor,'Color','b');
-%             plot(a2.dists/max(a2.dists),a2.vm,'LineWidth',curr*line_factor,'Color',ORANGE);
+            figure(fig_inj);
+            hold on;
+            plot(a1.dists/max(a1.dists),a1.vm,'LineWidth',curr*line_factor);
+            plot(a2.dists/max(a2.dists),a2.vm,'LineWidth',curr*line_factor,'Color','r');
 %            if t(1) > 1,
 %                plot(b1.dists,b1.vm,'LineWidth',curr*line_factor,'LineStyle','--');
 %                plot(b2.dists,b2.vm,'LineWidth',curr*line_factor,'Color','r','LineStyle','--');
 %            end
-%             hold off
+            hold off
             
             figure(fig_bg);
             hold on;
@@ -163,17 +165,16 @@ for i = 1:size(trees_config,1),
     
     if PLOT_SUMMARY,
         
-%         figValues(fig_inj);
-%         xlabel('Distance (normalized)');
-%         ylabel('I_{photo} (a.u.)');
-%         ylim([-1e4 1e4]);
-%         xlim([-0.05 1.05]);
-%         title(gca,sprintf('Evoked response for tree (%g,%g,%g)',t(1),t(2),t(3)));
-%         
-%         name = sprintf('%s%s_%s_electrotonicRangeWithCurrent',fname,EXPNAME,PREFIX);
-%         saveas(fig_inj,sprintf('%s_2.png',name),'png')
-%         export_fig(sprintf('%s.png',name));
-%         export_fig(sprintf('%s.eps',name));
+        figValues(fig_inj);
+        xlabel('Distance (normalized)');
+        ylabel('I_{photo} (a.u.)');
+        ylim([-1000 1000]);
+        title(gca,sprintf('Evoked response for tree (%g,%g,%g)',t(1),t(2),t(3)));
+        
+        name = sprintf('%s%s_electrotonicRangeWithCurrent.png',fname,EXPNAME);
+        saveas(fig_inj,sprintf('%s_2.png',name),'png')
+        export_fig(sprintf('%s.png',name));
+        export_fig(sprintf('%s.eps',name));
         
         
         
@@ -181,12 +182,10 @@ for i = 1:size(trees_config,1),
         figValues(fig_bg);
         xlabel('Distance (normalized)');
         ylabel('I_{photo} (a.u.)');
-        %ylim([-1000 1000]);
-        ylim([-1.5e4 1.5e4]);
-        xlim([-0.05 1.05]);
-        %title(gca,sprintf('Background response for tree (%g,%g,%g)',t(1),t(2),t(3)));
+        ylim([-1000 1000]);
+        title(gca,sprintf('Background response for tree (%g,%g,%g)',t(1),t(2),t(3)));
             
-        name = sprintf('%s%s_%s_electrotonicRange',fname,EXPNAME,PREFIX);
+        name = sprintf('%s%s_electrotonicRange.png',fname,EXPNAME);
         saveas(fig_bg,sprintf('%s_2.png',name),'png')
         export_fig(sprintf('%s.png',name));
         export_fig(sprintf('%s.eps',name));
