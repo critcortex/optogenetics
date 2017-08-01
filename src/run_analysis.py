@@ -10,7 +10,6 @@ import pickle as pkl
 import itertools
 import NeuroTools.signals  
 import math
-from xdg.Menu import tmp
 
 DEFAULT_FREQ = [0.5,1,1.5,2,2.5,4,5,6,7,8,9,10,15,20,30,35,40,45,50]
 DEFAULT_IRRAD = [1,2,5,10,20,50,100]

@@ -12,10 +12,10 @@ from multiprocessing import Process, Queue, current_process, freeze_support
 class NeuronExperiment():
 
     def main(self, experiment_dict):
-	# This is where you would set up the experiment in NEURON i.e. 
+        # This is where you would set up the experiment in NEURON i.e. 
         # h.init() 
         # Note that you should put this class in a separate file
-	print("Running an experiment with parameters:")
+        print("Running an experiment with parameters:")
         print(experiment_dict)
 
 
